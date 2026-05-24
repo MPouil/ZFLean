@@ -6,7 +6,6 @@ Authors: Vincent Trélat
 import ZFLean.Naturals
 import Mathlib.Algebra.Order.Ring.Defs
 import Mathlib.Algebra.Order.Group.Defs
-import Mathlib.SetTheory.Cardinal.SchroederBernstein
 
 /-! # ZFC Integers
 
@@ -17,8 +16,11 @@ numbers.
 The theory also comes with usual theorems and arithmetic operations on integers and wraps everything
 in a commutative ring structure.
 
-Finally, we show that that the `ZFInt` type is isomorphic to the type of elements contained in
-`ZFSet.Int` type using the Schröder-Bernstein theorem.
+Finally, we show that the `ZFInt` type is in canonical bijection with the type of elements
+contained in `ZFSet.Int`. The bijection is built directly from the projection functions
+`ZFInt.into` and `ZFInt.outof` — no Schröder–Bernstein, no `Classical.choice` over a non-empty
+set of bijections — so the induced order on `{x // x ∈ ZFSet.Int}` is well-defined and concrete
+inequalities like `0 < 1` are provable.
 -/
 
 namespace ZFSet
@@ -1154,7 +1156,13 @@ theorem mem_Int_proj' {x : ZFSet} :
     exact ⟨l ▸ hn, r⟩
 
 open Classical in
-private noncomputable def ZFInt.outof : {x // x ∈ Int} → ZFInt := fun ⟨n, hn⟩ =>
+/--
+Canonical projection from a set-theoretic integer (an element of `ZFSet.Int`) to its `ZFInt`
+counterpart. Given an element of `Int`, which by `mem_Int_proj'` is of the form `pair ∅ n` or
+`pair n ∅` for some `n ∈ Nat`, returns `mk (0, n)` or `mk (n, 0)` respectively. The definition is
+deterministic and does not depend on Schröder–Bernstein.
+-/
+noncomputable def ZFInt.outof : {x // x ∈ Int} → ZFInt := fun ⟨n, hn⟩ =>
   have := mem_Int_proj' hn
   if case : n.π₁ = ∅ ∧ n.π₂ ∈ Nat then
     ZFInt.mk ⟨0, n.π₂, case.right⟩
@@ -1313,227 +1321,115 @@ def ZFInt.EmbeddingIntZFInt : {x // x ∈ Int} ↪ ZFInt where
   toFun := outof
   inj' := outof.injective
 
-instance : LT {x // x ∈ Int} where
-  -- lt := fun ⟨x, hx⟩ ⟨y, hy⟩ =>
-  --   let x₁ : ZFNat := ⟨x.π₁, by
-  --     unfold Int at hx
-  --     simp_rw [mem_union, mem_prod, mem_singleton, exists_eq_left] at hx
-  --     rcases hx with ⟨a, ha, rfl⟩ | ⟨b, hb, rfl⟩
-  --     · rwa [π₁_pair]
-  --     · rw [π₁_pair]
-  --       exact ZFNat.zero_in_Nat⟩
-  --   let x₂ : ZFNat := ⟨x.π₂, by
-  --     unfold Int at hx
-  --     simp_rw [mem_union, mem_prod, mem_singleton, exists_eq_left] at hx
-  --     rcases hx with ⟨a, ha, rfl⟩ | ⟨b, hb, rfl⟩
-  --     · rw [π₂_pair]
-  --       exact ZFNat.zero_in_Nat
-  --     · rwa [π₂_pair]⟩
-  --   let y₁ : ZFNat := ⟨y.π₁, by
-  --     unfold Int at hy
-  --     simp_rw [mem_union, mem_prod, mem_singleton, exists_eq_left] at hy
-  --     rcases hy with ⟨a, ha, rfl⟩ | ⟨b, hb, rfl⟩
-  --     · rwa [π₁_pair]
-  --     · rw [π₁_pair]
-  --       exact ZFNat.zero_in_Nat⟩
-  --   let y₂ : ZFNat := ⟨y.π₂, by
-  --     unfold Int at hy
-  --     simp_rw [mem_union, mem_prod, mem_singleton, exists_eq_left] at hy
-  --     rcases hy with ⟨a, ha, rfl⟩ | ⟨b, hb, rfl⟩
-  --     · rw [π₂_pair]
-  --       exact ZFNat.zero_in_Nat
-  --     · rwa [π₂_pair]⟩
-  --   x₁ + y₂ < x₂ + y₁
+/--
+`outof` is a left inverse of `into`. This is the key fact making `outof`/`into` a canonical pair
+of inverse bijections between `ZFInt` and `{x // x ∈ Int}`, removing the need for an abstract
+Schröder–Bernstein bijection.
+-/
+theorem ZFInt.outof_into (x : ZFInt) : outof (into x) = x := by
+  conv_rhs => rw [← Quotient.out_eq x]
+  unfold into
+  generalize x.out = p
+  obtain ⟨a, b⟩ := p
+  dsimp only
+  by_cases hab : a < b
+  · rw [if_pos hab]
+    simp only [outof]
+    have h_cond : (ZFSet.pair (∅ : ZFSet) (b - a).1).π₁ = ∅ ∧
+                  (ZFSet.pair (∅ : ZFSet) (b - a).1).π₂ ∈ Nat :=
+      ⟨π₁_pair _ _, by rw [π₂_pair]; exact ZFNat.mem_Nat_sub⟩
+    rw [dif_pos h_cond]
+    refine sound ?_
+    change (0 : ZFNat) + b = ⟨_, h_cond.2⟩ + a
+    have hπ₂ : (⟨(ZFSet.pair (∅ : ZFSet) (b - a).1).π₂, h_cond.2⟩ : ZFNat) = b - a :=
+      Subtype.ext (π₂_pair _ _)
+    rw [hπ₂, ZFNat.zero_add, ZFNat.sub_add_cancel (Or.inl hab)]
+  · rw [if_neg hab]
+    simp only [outof]
+    by_cases hcond : (ZFSet.pair (a - b).1 (∅ : ZFSet)).π₁ = ∅ ∧
+                     (ZFSet.pair (a - b).1 (∅ : ZFSet)).π₂ ∈ Nat
+    · rw [dif_pos hcond]
+      have h_sub_zero : a - b = 0 :=
+        Subtype.ext ((π₁_pair (a - b).1 (∅ : ZFSet)).symm.trans hcond.1)
+      have h_le_ab : a ≤ b := ZFNat.sub_eq_zero_imp_le.mp h_sub_zero
+      have h_le_ba : b ≤ a := by push_neg at hab; exact hab
+      have ha_eq_b : a = b := ZFNat.le_antisymm h_le_ab h_le_ba
+      subst ha_eq_b
+      refine sound ?_
+      change (0 : ZFNat) + a = _ + a
+      have hπ₂ : (⟨(ZFSet.pair (a - a).1 (∅ : ZFSet)).π₂, hcond.2⟩ : ZFNat) = 0 :=
+        Subtype.ext (π₂_pair _ _)
+      rw [hπ₂]
+    · rw [dif_neg hcond]
+      push_neg at hab
+      -- Rewrite `π₁ (pair (a-b).1 ∅)` to `(a-b).1` via `simp` (which handles the dependent
+      -- proof in the inner ZFNat subtype); then proof irrelevance makes `⟨(a-b).1, _⟩`
+      -- definitionally `a - b`.
+      simp only [π₁_pair]
+      refine sound ?_
+      change (a - b) + b = (0 : ZFNat) + a
+      rw [ZFNat.zero_add]
+      exact ZFNat.sub_add_cancel hab
 
-  lt x y :=
-    let f := Classical.choice
-      (Function.Embedding.antisymm ZFInt.EmbeddingZFIntInt ZFInt.EmbeddingIntZFInt)
-    f.invFun x < f.invFun y
+/-- `into` is a right inverse of `outof`. -/
+theorem ZFInt.into_outof (y : {x // x ∈ Int}) : into (outof y) = y :=
+  outof_inj _ _ (outof_into _)
 
 attribute [-instance] SetLike.instPartialOrder
 
--- instance instPreorderSubtypeMemInt.{u} : Preorder {x // x ∈ Int} where
---   le x y := instLTSubtypeMemInt.lt x y ∨ x = y
---   le_refl := fun _ => Or.inr rfl
---   le_trans := by
---     rintro ⟨x, hx⟩ ⟨y, hy⟩ ⟨z, hz⟩ hxy hyz
---     have (w : {x : ZFSet.{u} // x ∈ Int.{u}}) : ∃ (a b : ZFNat), w = a.val.pair b.val := by
---       obtain ⟨w, hw⟩ := w
---       simp_rw [mem_union, mem_prod, mem_singleton, exists_eq_left] at hw
---       exists ⟨w.π₁, ?_⟩, ⟨w.π₂, ?_⟩
---       · rcases hw with ⟨a, ha, rfl⟩ | ⟨b, hb, rfl⟩
---         · rwa [π₁_pair]
---         · rw [π₁_pair]
---           exact ZFNat.zero_in_Nat
---       · rcases hw with ⟨a, ha, rfl⟩ | ⟨b, hb, rfl⟩
---         · rw [π₂_pair]
---           exact ZFNat.zero_in_Nat
---         · rwa [π₂_pair]
---       · rcases hw with ⟨a, ha, rfl⟩ | ⟨b, hb, rfl⟩ <;>
---         · dsimp
---           rw [pair_inj, π₁_pair, π₂_pair]
---           exact ⟨rfl, rfl⟩
-
---     obtain ⟨x₁, x₂, rfl⟩ := this ⟨x, hx⟩
---     obtain ⟨y₁, y₂, rfl⟩ := this ⟨y, hy⟩
---     obtain ⟨z₁, z₂, rfl⟩ := this ⟨z, hz⟩
---     unfold LT.lt instLTSubtypeMemInt at hxy hyz ⊢
---     simp at hxy hyz ⊢
---     rcases hxy with hxy | ⟨rfl, rfl⟩ <;>
---     rcases hyz with hyz | ⟨rfl, rfl⟩
---     · left
---       have : x₁ + z₂ + y₁ + y₂ < x₂ + z₁ + y₁ + y₂ := by
---         conv_lhs =>
---           rw [add_assoc, add_comm y₁, add_assoc, add_comm z₂, add_assoc, ←add_assoc]
---         conv_rhs =>
---           rw [add_assoc, add_assoc, add_comm z₁, add_assoc, ←add_assoc]
---         exact ZFNat.add_lt_add_of_le_of_lt (.inl hxy) hyz
---       simp_rw [ZFNat.add_lt_add_iff_right] at this
---       exact this
---     · left
---       exact hxy
---     · left
---       exact hyz
---     · right
---       exact ⟨rfl, rfl⟩
---   lt_iff_le_not_ge := by
---     intro x y
---     constructor
---     · intro h
---       and_intros
---       · left; exact h
---       · rw [not_or]
---         and_intros
---         · unfold LT.lt instLTSubtypeMemInt at h ⊢
---           simp only [gt_iff_lt, not_lt] at h ⊢
---           left
---           conv_lhs => rw [add_comm]
---           conv_rhs => rw [add_comm]
---           exact h
---         · rintro rfl
---           unfold LT.lt instLTSubtypeMemInt at h
---           dsimp at h
---           rw [add_comm] at h
---           apply ZFNat.lt_irrefl h
---     · intro ⟨l, r⟩
---       rcases l with l | rfl
---       · rw [not_or] at r
---         exact l
---       · rw [not_or] at r
---         nomatch r.2 rfl
-
 /--
-The Schröder-Bernstein theorem provides a bijection between `ZFInt` and `{x // x ∈ Int}`, but we
-need an isomorphism in order to preserve the order structure, so that the order on `ZFInt` and
-`{x // x ∈ Int}` is the same.
+Canonical linear order on the set-theoretic integers, defined as the pullback of the linear order
+on `ZFInt` along the canonical projection `outof`. With this definition, statements like `0 < 1`
+on `{x // x ∈ Int}` reduce to the corresponding statements on `ZFInt`, so they are decidable —
+unlike the previous Schröder–Bernstein-based definition, which made specific instances of `<`
+unprovable.
 -/
-theorem ZFInt.exists_mono_bij.{u} :
-  Nonempty {f : ZFInt.{u} → {x // x ∈ Int.{u}} // Function.Bijective f ∧ ∀ x y, f x < f y ↔ x < y}
-  := by
-  rw [nonempty_subtype]
-  let f := Classical.choice
-    (Function.Embedding.antisymm ZFInt.EmbeddingZFIntInt ZFInt.EmbeddingIntZFInt)
-  exists f
-  apply And.intro
-  · exact Equiv.bijective f
-  · intro x y
-    unfold f
-    dsimp [LT.lt, instLTSubtypeMemInt, int_lt]
-    apply Eq.to_iff
-    congr
-    · exact Equiv.symm_apply_apply (Classical.choice _) x
-    · exact Equiv.symm_apply_apply (Classical.choice _) y
-
-theorem ZFInt.exists_mono_bij_zero_eq.{u} :
-  Nonempty {f : ZFInt.{u} → {x // x ∈ Int.{u}} //
-    Function.Bijective f ∧ (∀ x y, f x < f y ↔ x < y) ∧ f 0 = ⟨ofInt 0, mem_ofInt_Int 0⟩}
-  := by
-  rw [nonempty_subtype]
-  by_contra!
-  let ⟨f, bij, mono⟩ := Classical.choice ZFInt.exists_mono_bij
-  have ⟨x₀, x₀_def, x₀_unique⟩ := Function.Bijective.existsUnique bij ⟨ofInt 0, mem_ofInt_Int 0⟩
-  beta_reduce at x₀_def x₀_unique
-  let f' : ZFInt → {x // x ∈ Int} := fun x => f (x + x₀)
-  specialize this f' ?_ ?_
-  · and_intros
-    · intro x y eq
-      apply bij.1 at eq
-      rwa [add_right_cancel_iff] at eq
-    · intro y
-      obtain ⟨x, hx⟩ := bij.2 y
-      exists x - x₀
-      unfold f'
-      rwa [sub_add_cancel]
-  · intro x y
-    unfold f'
-    rw [mono _ _, add_lt_add_iff_right]
-  · unfold f' at this
-    rw [zero_add] at this
-    contradiction
+noncomputable instance instLinearOrderSubtypeMemInt : LinearOrder {x // x ∈ Int} where
+  le x y := ZFInt.outof x ≤ ZFInt.outof y
+  lt x y := ZFInt.outof x < ZFInt.outof y
+  le_refl x := le_refl (ZFInt.outof x)
+  le_trans _ _ _ h₁ h₂ := le_trans h₁ h₂
+  lt_iff_le_not_ge x y :=
+    lt_iff_le_not_ge (a := ZFInt.outof x) (b := ZFInt.outof y)
+  le_antisymm _ _ h₁ h₂ := ZFInt.outof_inj _ _ (le_antisymm h₁ h₂)
+  le_total x y := le_total (ZFInt.outof x) (ZFInt.outof y)
+  toDecidableLE _ _ := Classical.propDecidable _
 
 /--
-The type `ZFInt` correctly represents the set `ZFSet.Int`.
-
-**NOTE**: There is a constructive proof of the Schröder-Bernstein theorem stating
-the equi-computability of sets. It is called the Myhill isomorphism and applies
-to countable sets only.
+The type `ZFInt` is in canonical bijection with the subtype `{x // x ∈ ZFSet.Int}`. The
+equivalence is built directly from `ZFInt.into` and `ZFInt.outof` — no Schröder–Bernstein, no
+`Classical.choice` over a non-empty set of bijections. In particular, `instEquivZFIntInt x` is
+deterministic in `x`.
 -/
 @[reducible]
-instance instEquivZFIntInt : ZFInt ≃ {x // x ∈ Int} :=
-  let ⟨f, bij, _⟩ := Classical.choice ZFInt.exists_mono_bij_zero_eq
-  Equiv.ofBijective f bij
+noncomputable instance instEquivZFIntInt : ZFInt ≃ {x // x ∈ Int} where
+  toFun := ZFInt.into
+  invFun := ZFInt.outof
+  left_inv := ZFInt.outof_into
+  right_inv := ZFInt.into_outof
 
 instance : Coe ZFInt {x // x ∈ Int} := ⟨instEquivZFIntInt.toFun⟩
 instance : Coe {x // x ∈ Int} ZFInt := ⟨instEquivZFIntInt.invFun⟩
 
-theorem instEquivZFIntInt.mono_iff.{u} (x y : { x // x ∈ Int.{u} }) :
-  instEquivZFIntInt.{u}.invFun x < instEquivZFIntInt.{u}.invFun y ↔ x < y := by
-  constructor
-  · intro h
-    dsimp [instEquivZFIntInt] at h
-    split at h
-    rename_i f' f bij mono eq; clear f' eq
-    unfold Equiv.ofBijective at h
-    dsimp at h
-    have := mono.1
-      (Function.surjInv (Function.Bijective.surjective bij) x)
-      (Function.surjInv (Function.Bijective.surjective bij) y) |>.mpr h
-    iterate 2 rw [Function.rightInverse_surjInv (Function.Bijective.surjective bij)] at this
-    exact this
-  · intro h
-    dsimp [instEquivZFIntInt]
-    split
-    rename_i f' f bij mono eq; clear f' eq
-    let f' := Function.surjInv (Function.Bijective.surjective bij)
-    have mono' : ∀ x y, f' x < f' y ↔ x < y := by
-      intro x y
-      have := mono.1 (f' x) (f' y)
-      iterate 2 rw [Function.rightInverse_surjInv (Function.Bijective.surjective bij)] at this
-      exact this.symm
-    unfold Equiv.ofBijective
-    dsimp
-    exact mono' x y |>.mpr h
+/--
+The canonical equivalence preserves order: the strict order on `{x // x ∈ Int}` is exactly the
+pullback of the strict order on `ZFInt` along `instEquivZFIntInt.invFun = ZFInt.outof`.
+-/
+theorem instEquivZFIntInt.mono_iff (x y : {x // x ∈ Int}) :
+    instEquivZFIntInt.invFun x < instEquivZFIntInt.invFun y ↔ x < y :=
+  Iff.rfl
 
-instance : Preorder {x // x ∈ Int} where
-  le x y := ZFInt.instPartialOrder.le x y
-  le_refl x := ZFInt.instLinearOrder.le_refl x
-  le_trans x y z := ZFInt.instLinearOrder.le_trans x y z
-  lt_iff_le_not_ge x y := by
-    symm
-    trans
-    · exact ZFInt.instLinearOrder.lt_iff_le_not_ge x y |>.symm
-    · exact instEquivZFIntInt.mono_iff x y
-
-instance : LinearOrder {x // x ∈ Int} where
-  le := (ZFInt.instLinearOrder.le · ·)
-  le_refl := (ZFInt.instLinearOrder.le_refl ·)
-  le_trans := (ZFInt.instLinearOrder.le_trans · · ·)
-  le_antisymm x y h h' := by
-    have := ZFInt.instLinearOrder.le_antisymm x y h h'
-    rwa [Equiv.invFun_as_coe, EmbeddingLike.apply_eq_iff_eq] at this
-  le_total := (ZFInt.instLinearOrder.le_total · ·)
-  toDecidableLE := (ZFInt.instLinearOrder.toDecidableLE · ·)
-  lt_iff_le_not_ge _ _ := lt_iff_le_not_ge --instPreorderSubtypeMemInt.lt_iff_le_not_ge
+/--
+Regression check addressing the well-definedness reviewer comment: with the canonical order on
+`{x // x ∈ Int}`, `0 < 1` is decidable. Specifically, the images of `(0 : ZFInt)` and
+`(1 : ZFInt)` under the canonical equivalence satisfy strict inequality, and the proof reduces
+to `ZFInt.zero_lt_one` after unfolding `outof ∘ into`.
+-/
+example :
+    (instEquivZFIntInt (0 : ZFInt) : {x // x ∈ Int}) < instEquivZFIntInt (1 : ZFInt) := by
+  change ZFInt.outof (ZFInt.into 0) < ZFInt.outof (ZFInt.into 1)
+  rw [ZFInt.outof_into, ZFInt.outof_into]
+  exact ZFInt.zero_lt_one
 
 end ZFIntEquivInt
 end Integers
