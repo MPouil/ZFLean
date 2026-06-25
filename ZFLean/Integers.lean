@@ -634,7 +634,7 @@ lemma induction_pos {P : ZFInt → Prop} (n : ZFInt) (n_pos : 0 ≤ n)
   induction n using Quotient.ind
   rename_i n
   obtain ⟨n, m⟩ := n
-  rcases ZFNat.instIsStrictTotalOrderLt.trichotomous n m with h | rfl | h
+  rcases lt_trichotomy n m with h | rfl | h
   · exfalso
     rw [ZFInt.lt_zero_iff] at h
     rcases n_pos with n_pos | eq
@@ -689,7 +689,7 @@ lemma induction_neg {P : ZFInt → Prop} (n : ZFInt) (n_neg : n ≤ 0)
 @[induction_eliminator]
 theorem induction {P : ZFInt → Prop} (n : ZFInt)
   (zero : P 0) (pos : ∀ k, P k → P (k + 1)) (neg : ∀ k, P k → P (k - 1)) : P n := by
-  rcases instIsStrictTotalOrderLt.trichotomous n 0 with h | rfl | h
+  rcases lt_trichotomy n 0 with h | rfl | h
   · exact induction_neg n (Or.inl h) zero neg
   · exact zero
   · exact induction_pos n (Or.inl h) zero pos
@@ -870,7 +870,7 @@ theorem pos_of_mul_pos {a b : ZFInt} (h : 0 < a * b) (ha : 0 < a) : 0 < b := by
   rcases hb with rfl | hb
   · rw [mul_zero] at h
     exact lt_irrefl h
-  · rcases instIsStrictTotalOrderLt.trichotomous a b with h' | rfl | h'
+  · rcases lt_trichotomy a b with h' | rfl | h'
     · nomatch lt_irrefl <| lt_trans (lt_trans ha h') hb
     · nomatch lt_irrefl <| lt_trans ha hb
     · nomatch lt_irrefl <| lt_trans h <| mul_pos_neg_neg a b ha hb
@@ -921,7 +921,7 @@ theorem mul_eq_zero_iff {a b : ZFInt} : a * b = 0 ↔ a = 0 ∨ b = 0 := by
     induction b using Quotient.ind
     rename_i a b
     simp_rw [mk_eq, mul_eq, zero_eq, eq, ZFSet.zrel, ZFNat.add_zero] at h ⊢
-    rcases ZFNat.instIsStrictTotalOrderLt.trichotomous b.1 b.2 with h' | eq | h'
+    rcases lt_trichotomy b.1 b.2 with h' | eq | h'
     · have := ZFNat.add_eq_add_sub_eq_sub h.symm
       rw [←ZFNat.left_distrib_mul_sub, ←ZFNat.left_distrib_mul_sub] at this
       have b₁b₂_ne_0 : b.2 - b.1 ≠ 0 := by
@@ -1106,7 +1106,7 @@ noncomputable def π₂ (x : ZFSet) : ZFSet :=
 @[simp] theorem pair_minus {x y : ZFSet} : x ≠ y → {x, y} \ {x} = ({y} : ZFSet) := by
   intro x_ne_y
   ext z
-  rw [mem_diff, mem_pair, mem_singleton, mem_singleton]
+  rw [mem_sdiff, mem_pair, mem_singleton, mem_singleton]
   constructor
   · rintro ⟨rfl | rfl, r⟩
     · contradiction
@@ -1123,7 +1123,7 @@ noncomputable def π₂ (x : ZFSet) : ZFSet :=
     rw [sUnion_pair, pair_union, sInter_pair, pair_inter] at h
     rw [ZFSet.ext_iff] at h
     specialize h y
-    simpa only [mem_diff, mem_insert_iff, mem_singleton, eq_self,
+    simpa only [mem_sdiff, mem_insert_iff, mem_singleton, eq_self,
       or_true, true_and, notMem_empty, iff_false, not_not, eq_comm] using h
   · unfold pair at *
     rw [sUnion_pair, pair_union, sInter_pair, pair_inter] at h ⊢
@@ -1375,7 +1375,7 @@ theorem ZFInt.outof_into (x : ZFInt) : outof (into x) = x := by
 theorem ZFInt.into_outof (y : {x // x ∈ Int}) : into (outof y) = y :=
   outof_inj _ _ (outof_into _)
 
-attribute [-instance] SetLike.instPartialOrder
+attribute [-instance] ZFSet.instPartialOrder
 
 /--
 Canonical linear order on the set-theoretic integers, defined as the pullback of the linear order
@@ -1402,7 +1402,7 @@ equivalence is built directly from `ZFInt.into` and `ZFInt.outof` — no Schröd
 deterministic in `x`.
 -/
 @[reducible]
-noncomputable instance instEquivZFIntInt : ZFInt ≃ {x // x ∈ Int} where
+noncomputable def instEquivZFIntInt : ZFInt ≃ {x // x ∈ Int} where
   toFun := ZFInt.into
   invFun := ZFInt.outof
   left_inv := ZFInt.outof_into

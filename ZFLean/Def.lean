@@ -111,7 +111,7 @@ infix:70 " Δ " => symmDiff
 
 @[simp]
 theorem mem_symmDiff (x p q : ZFSet) : x ∈ p Δ q ↔ (x ∈ p ∧ x ∉ q) ∨ (x ∈ q ∧ x ∉ p) := by
-  simp only [symmDiff, mem_union, mem_diff]
+  simp only [symmDiff, mem_union, mem_sdiff]
 
 @[simp]
 theorem symmDiff_empty (p : ZFSet) : p Δ ∅ = p := by

@@ -62,7 +62,7 @@ theorem bijective_of_injective_on_subset {A B : ZFSet}
     induction n with
     | zero =>
       intro x x_mem_C
-      rw [C, mem_diff] at x_mem_C
+      rw [C, mem_sdiff] at x_mem_C
       exact x_mem_C.1
     | succ n ih =>
       intro x x_mem_C
@@ -83,7 +83,7 @@ theorem bijective_of_injective_on_subset {A B : ZFSet}
     · apply fapply_mem_range
     · push_neg at mem_Cn
       specialize mem_Cn 0
-      rw [C, mem_diff, not_and, not_not] at mem_Cn
+      rw [C, mem_sdiff, not_and, not_not] at mem_Cn
       exact mem_Cn xA
   have v_inj : IsInjective v := by
     intro x y z hx hy hz eq₁ eq₂
@@ -123,7 +123,7 @@ theorem bijective_of_injective_on_subset {A B : ZFSet}
     · obtain ⟨n, y_mem_Cn⟩ := y_mem_C
       have : n ≠ 0 := by
         rintro rfl
-        rw [C, mem_diff] at y_mem_Cn
+        rw [C, mem_sdiff] at y_mem_Cn
         nomatch y_mem_Cn.2 yB
       obtain ⟨n, rfl⟩ := Nat.exists_eq_succ_of_ne_zero this
       rw [C, mem_sep] at y_mem_Cn
@@ -1024,7 +1024,7 @@ theorem ZFNat.iso_eq_iff {n m : ZFNat} : ↑n ≅ᶻ ↑m ↔ n = m where
           · rw [mem_sep, pair_mem_prod]
             and_intros
             · exact zn
-            · rw [mem_diff, mem_singleton]
+            · rw [mem_sdiff, mem_singleton]
               and_intros
               · exact isfunc.1 hy |> pair_mem_prod.mp |>.2
               · rintro ⟨⟩
@@ -1034,12 +1034,12 @@ theorem ZFNat.iso_eq_iff {n m : ZFNat} : ↑n ≅ᶻ ↑m ↔ n = m where
                   exact lt_succ
             · exact hy
           · intro w hzw
-            rw [mem_sep, pair_mem_prod, mem_diff, mem_singleton] at hzw
+            rw [mem_sep, pair_mem_prod, mem_sdiff, mem_singleton] at hzw
             exact y_unq w hzw.2
       have bij' : IsBijective f' this := by
         rw [bijective_exists1_iff]
         intro y hy
-        rw [mem_diff, add_one_eq_succ, mem_singleton, succ, mem_insert_iff] at hy
+        rw [mem_sdiff, add_one_eq_succ, mem_singleton, succ, mem_insert_iff] at hy
         obtain ⟨rfl | y_mem_k, y_ne_ℓ⟩ := hy
         · rw [bijective_exists1_iff] at bij
           have := bij k ?_
@@ -1051,7 +1051,7 @@ theorem ZFNat.iso_eq_iff {n m : ZFNat} : ↑n ≅ᶻ ↑m ↔ n = m where
                 rw [add_one_eq_succ]; exact lt_succ) |>.unique x_k_f hℓ
             · and_intros <;> beta_reduce
               · exact x_mem_n
-              · rw [mem_sep, pair_mem_prod, mem_diff, mem_singleton]
+              · rw [mem_sep, pair_mem_prod, mem_sdiff, mem_singleton]
                 and_intros
                 · exact x_mem_n
                 · rw [add_one_eq_succ]
@@ -1059,7 +1059,7 @@ theorem ZFNat.iso_eq_iff {n m : ZFNat} : ↑n ≅ᶻ ↑m ↔ n = m where
                 · exact y_ne_ℓ
                 · exact x_k_f
               · rintro y ⟨yn, y_k_f⟩
-                rw [mem_sep, pair_mem_prod, mem_diff, mem_singleton] at y_k_f
+                rw [mem_sep, pair_mem_prod, mem_sdiff, mem_singleton] at y_k_f
                 apply bij k (by rw [add_one_eq_succ]; exact lt_succ) |>.unique
                 · and_intros
                   · rw [add_one_eq_succ, succ, mem_insert_iff]
@@ -1083,7 +1083,7 @@ theorem ZFNat.iso_eq_iff {n m : ZFNat} : ↑n ≅ᶻ ↑m ↔ n = m where
                 rw [add_one_eq_succ]; exact lt_succ) |>.unique x_k_f hℓ
             · and_intros <;> beta_reduce
               · exact x_mem_n
-              · rw [mem_sep, pair_mem_prod, mem_diff, mem_singleton]
+              · rw [mem_sep, pair_mem_prod, mem_sdiff, mem_singleton]
                 and_intros
                 · exact x_mem_n
                 · rw [add_one_eq_succ, succ, mem_insert_iff]
@@ -1092,7 +1092,7 @@ theorem ZFNat.iso_eq_iff {n m : ZFNat} : ↑n ≅ᶻ ↑m ↔ n = m where
                 · exact y_ne_ℓ
                 · exact x_k_f
               · rintro z ⟨zn, z_k_f⟩
-                rw [mem_sep, pair_mem_prod, mem_diff, mem_singleton] at z_k_f
+                rw [mem_sep, pair_mem_prod, mem_sdiff, mem_singleton] at z_k_f
                 apply bij y ?_ |>.unique
                 · and_intros
                   · rw [add_one_eq_succ, succ, mem_insert_iff]
@@ -1120,7 +1120,7 @@ theorem ZFNat.iso_eq_iff {n m : ZFNat} : ↑n ≅ᶻ ↑m ↔ n = m where
         · and_intros
           · intro x y z hz hy hz g_xz g_yz
             dsimp [g] at g_xz g_yz
-            simp only [mem_sep, mem_prod, mem_diff, mem_singleton, pair_inj,
+            simp only [mem_sep, mem_prod, mem_sdiff, mem_singleton, pair_inj,
               exists_eq_right_right', π₁_pair, π₂_pair] at g_xz g_yz
             obtain ⟨⟨mem_x_k, mem_z_succ_k, z_ne_ℓ⟩, z_eq⟩ := g_xz
             obtain ⟨⟨mem_y_k, -, -⟩, z_eq'⟩ := g_yz
@@ -1181,14 +1181,13 @@ theorem ZFNat.iso_eq_iff {n m : ZFNat} : ↑n ≅ᶻ ↑m ↔ n = m where
             -- reason into naturals
             have y_Nat : y ∈ Nat := by
               apply mem_Nat_of_mem_mem_Nat (k.succ.prop)
-              rw [add_one_eq_succ, mem_diff] at hy
+              rw [add_one_eq_succ, mem_sdiff] at hy
               exact hy.1
             have ℓ_Nat : ℓ ∈ Nat := mem_Nat_of_mem_mem_Nat (k.succ.prop) (by
               rwa [add_one_eq_succ] at ℓ_mem_m)
             let Y : ZFNat := ⟨y, y_Nat⟩
             let L : ZFNat := ⟨ℓ, ℓ_Nat⟩
-
-            simp only [add_one_eq_succ, succ, mem_insert_iff, mem_diff, mem_singleton] at hy
+            simp only [add_one_eq_succ, succ, mem_insert_iff, mem_sdiff, mem_singleton] at hy
             obtain ⟨rfl | y_mem_k, y_ne_ℓ⟩ := hy
             · have ℓ_Nat : ℓ ∈ Nat := mem_Nat_of_mem_mem_Nat (k.succ.prop) (by
                 rwa [add_one_eq_succ] at ℓ_mem_m)
@@ -1200,7 +1199,7 @@ theorem ZFNat.iso_eq_iff {n m : ZFNat} : ↑n ≅ᶻ ↑m ↔ n = m where
                 · obtain ⟨s, rfl⟩ := this
                   use s, lt_succ
                   unfold g
-                  simp only [mem_sep, pair_mem_prod, mem_diff, mem_singleton, π₁_pair, π₂_pair]
+                  simp only [mem_sep, pair_mem_prod, mem_sdiff, mem_singleton, π₁_pair, π₂_pair]
                   and_intros
                   · exact lt_succ
                   · rw [add_one_eq_succ]
@@ -1224,7 +1223,7 @@ theorem ZFNat.iso_eq_iff {n m : ZFNat} : ↑n ≅ᶻ ↑m ↔ n = m where
               · change Y < L at y_lt_ℓ
                 use y, y_mem_k
                 dsimp [g]
-                simp only [mem_sep, mem_prod, mem_diff, mem_singleton, pair_inj,
+                simp only [mem_sep, mem_prod, mem_sdiff, mem_singleton, pair_inj,
                   exists_eq_right_right', π₁_pair, π₂_pair]
                 split_ifs
                 · and_intros
@@ -1270,7 +1269,7 @@ theorem ZFNat.iso_eq_iff {n m : ZFNat} : ↑n ≅ᶻ ↑m ↔ n = m where
                         and_intros
                         · change s < k
                           exact lt_of_succ_lt y_mem_k
-                        · rw [mem_diff, mem_singleton]
+                        · rw [mem_sdiff, mem_singleton]
                           and_intros
                           · change s.succ < k + 1
                             rw [add_one_eq_succ, ←succ_mono]
@@ -1291,7 +1290,7 @@ theorem ZFNat.iso_eq_iff {n m : ZFNat} : ↑n ≅ᶻ ↑m ↔ n = m where
                         and_intros
                         · change L < k
                           exact lt_of_succ_lt y_mem_k
-                        · rw [mem_diff, mem_singleton]
+                        · rw [mem_sdiff, mem_singleton]
                           and_intros
                           · change L.succ < k + 1
                             rw [add_one_eq_succ, ←succ_mono]
@@ -1314,7 +1313,7 @@ theorem ZFNat.iso_eq_iff {n m : ZFNat} : ↑n ≅ᶻ ↑m ↔ n = m where
           and_intros
           · exact sep_subset_self
           · intro x x_mem_k
-            simp only [mem_sep, mem_prod, mem_diff, mem_singleton, pair_inj,
+            simp only [mem_sep, mem_prod, mem_sdiff, mem_singleton, pair_inj,
               exists_eq_right_right', π₁_pair, π₂_pair]
             split_ifs with x_mem_ℓ
             · use x
