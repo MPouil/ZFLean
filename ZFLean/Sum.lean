@@ -1,7 +1,21 @@
+/-
+Copyright (c) 2025 Vincent Trélat. All rights reserved.
+Released under Apache 2.0 license as described in the file LICENSE.
+Authors: Vincent Trélat
+-/
 import ZFLean.Basic
 import ZFLean.Booleans
 import ZFLean.Integers
 import ZFLean.Functions
+
+/-!
+# Disjoint sums and options over ZF sets
+
+This file defines the disjoint sum `A ⊎ B` of two `ZFSet`s as a subtype, with
+constructors, eliminators, and an equivalence to the type-level sum. It also develops
+`Option S` together with bijections relating it to `_root_.Option` and a lifting of
+functions to options.
+-/
 
 namespace ZFSet
 

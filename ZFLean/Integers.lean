@@ -82,7 +82,7 @@ theorem one_ne_zero : (1 : ZFInt) ≠ 0 := by
   rw [zero_eq, one_eq]
   rintro h
   rw [ZFInt.eq, ZFSet.zrel] at h
-  simp at h
+  simp only [add_zero] at h
   unfold_projs at h
   injection h with h
   rw [ZFSet.ext_iff] at h
@@ -198,7 +198,7 @@ theorem neg_add_cancel_right (a b : ZFInt) : a + -b + b = a := by
 
 theorem add_left_cancel {a b c : ZFInt} (h : a + b = a + c) : b = c := by
   have h₁ : -a + (a + b) = -a + (a + c) := by rw [h]
-  simp [add_assoc, add_left_neg, zero_add] at h₁
+  simp only [add_assoc, add_left_neg, zero_add] at h₁
   exact h₁
 
 @[simp]
@@ -278,24 +278,19 @@ private theorem mul_wf {a b c d s t u v : ZFNat}
   (h₁ : ZFSet.zrel (a, b) (s, t)) (h₂ : ZFSet.zrel (c, d) (u, v)) :
   ZFSet.zrel (a * c + b * d, a * d + b * c) (s * u + t * v, s * v + t * u) := by
   dsimp [ZFSet.zrel] at *
-
   suffices h₃ : t * c + a * c + b * d + s * v + t * u = a * d + b * c + s * u + t * v + t * c by
     simp_rw [ZFNat.add_comm _ (t*c), ← ZFNat.add_assoc (t*c)] at h₃
     apply ZFNat.add_left_cancel.mp at h₃
     simp_rw [ZFNat.add_assoc, h₃]
-
   conv in t*c + a*c => rw [← right_distrib, ZFNat.add_comm, h₁, right_distrib]
   conv in _ + t*v + t*c => rw [← ZFNat.add_assoc, ← left_distrib, ZFNat.add_comm v c, h₂,
     left_distrib, ZFNat.add_assoc]
-
   apply ZFNat.add_right_cancel.mpr
-
   conv_rhs =>
     rw [ZFNat.add_comm, ZFNat.add_assoc, ZFNat.add_assoc, ← right_distrib, ZFNat.add_comm t a, h₁,
       right_distrib]
     rw [ZFNat.add_comm (b * d + s * d), ZFNat.add_assoc, ← ZFNat.add_assoc,  ← left_distrib s, ← h₂,
       left_distrib]
-
   ac_rfl
 
 noncomputable abbrev mul (n m : ZFInt) : ZFInt :=
@@ -512,7 +507,7 @@ theorem lt_iff_le_not_ge {x y : ZFInt} : x < y ↔ x ≤ y ∧ ¬y ≤ x := by
       · nomatch lt_irrefl ‹_›
   · rintro ⟨h | rfl, h'⟩
     · assumption
-    · simp only [int_le, or_true] at h'
+    · simp only [LE.le, or_true] at h'
       contradiction
 
 theorem lt_neg_iff {a b : ZFInt} : a < b ↔ -b < -a := by
@@ -1020,11 +1015,11 @@ noncomputable def toZFInt : ℤ → ZFInt
 example : ofInt 0 = {{∅}} := by
   dsimp [ofInt, pair]
   ext x
-  simp
+  simp only [Nat.cast_zero, mem_insert_iff, mem_singleton, or_iff_left_iff_imp]
   intro
   subst x
   ext x
-  simp
+  simp only [mem_insert_iff, mem_singleton, or_iff_left_iff_imp]
   exact id
 
 section -- could be another definition
@@ -1142,7 +1137,7 @@ theorem mem_Int_proj {x : ZFSet} (h : x ∈ Int) :
   ∃ n ∈ Nat, (x.π₁ = ∅ ∧ x.π₂ = n) ∨ (x.π₁ = n ∧ x.π₂ = ∅) := by
   simp_rw [mem_union, mem_prod] at h
   rcases h with ⟨a, ha, b, hb, x_eq⟩ | ⟨b, hb, a, ha, x_eq⟩
-    <;> (simp at hb; subst x_eq; rw [π₁_pair, π₂_pair]; exists a)
+    <;> (simp only [mem_singleton] at hb; subst x_eq; rw [π₁_pair, π₂_pair]; exists a)
   · exact ⟨ha, .inr ⟨rfl, hb⟩⟩
   · exact ⟨ha, .inl ⟨hb, rfl⟩⟩
 
@@ -1172,7 +1167,7 @@ noncomputable def ZFInt.outof : {x // x ∈ Int} → ZFInt := fun ⟨n, hn⟩ =>
 theorem ZFInt.outof_inj (x y : {x // x ∈ Int}) : outof x = outof y → x = y := by
   let ⟨x, hx⟩ := x
   let ⟨y, hy⟩ := y
-  simp [outof]
+  simp only [outof, Subtype.mk.injEq]
   intro outof_eq
   split_ifs at outof_eq with h₁ h₂ h₂
     <;> (
@@ -1184,12 +1179,12 @@ theorem ZFInt.outof_inj (x y : {x // x ∈ Int}) : outof x = outof y → x = y :
       | obtain ⟨l₂, r₂⟩ := Or.resolve_left (mem_Int_proj' hy) h₂
     )
   · apply exact at outof_eq
-    simp [ZFSet.zrel] at outof_eq
+    simp only [ZFSet.zrel, _root_.zero_add, _root_.add_zero, Subtype.mk.injEq] at outof_eq
     simp_rw [mem_union, mem_prod] at hx hy
     rcases hx, hy with ⟨⟨_, _, _, _, rfl⟩|⟨_, _, _, _, rfl⟩,⟨_, _, _, _, rfl⟩|⟨_, _, _, _, rfl⟩⟩
       <;> (simp [π₁_pair, π₂_pair] at l₁ r₁ l₂ r₂ outof_eq; subst_eqs; congr)
   · apply exact at outof_eq
-    simp [ZFSet.zrel] at outof_eq
+    simp only [ZFSet.zrel, _root_.add_zero] at outof_eq
     obtain ⟨l₃, r₃⟩ := ZFNat.eq_zero_of_add_eq_zero outof_eq.symm
     injection l₃ with l₃
     injection r₃ with r₃
@@ -1197,7 +1192,7 @@ theorem ZFInt.outof_inj (x y : {x // x ∈ Int}) : outof x = outof y → x = y :
     rcases hx, hy with ⟨⟨_, _, _, _, rfl⟩|⟨_, _, _, _, rfl⟩,⟨_, _, _, _, rfl⟩|⟨_, _, _, _, rfl⟩⟩
       <;> (simp [π₁_pair, π₂_pair] at l₁ r₁ l₂ r₂ l₃ r₃ outof_eq; subst_eqs; congr)
   · apply exact at outof_eq
-    simp [ZFSet.zrel] at outof_eq
+    simp only [ZFSet.zrel, _root_.add_zero] at outof_eq
     obtain ⟨l₃, r₃⟩ := ZFNat.eq_zero_of_add_eq_zero outof_eq
     injection l₃ with l₃
     injection r₃ with r₃
@@ -1205,7 +1200,7 @@ theorem ZFInt.outof_inj (x y : {x // x ∈ Int}) : outof x = outof y → x = y :
     rcases hx, hy with ⟨⟨_, _, _, _, rfl⟩|⟨_, _, _, _, rfl⟩,⟨_, _, _, _, rfl⟩|⟨_, _, _, _, rfl⟩⟩
       <;> (simp [π₁_pair, π₂_pair] at l₁ r₁ l₂ r₂ l₃ r₃ outof_eq; subst_eqs; congr)
   · apply exact at outof_eq
-    simp [ZFSet.zrel] at outof_eq
+    simp only [ZFSet.zrel, _root_.add_zero, _root_.zero_add, Subtype.mk.injEq] at outof_eq
     simp_rw [mem_union, mem_prod] at hx hy
     rcases hx, hy with ⟨⟨_, _, _, _, rfl⟩|⟨_, _, _, _, rfl⟩,⟨_, _, _, _, rfl⟩|⟨_, _, _, _, rfl⟩⟩
       <;> (simp [π₁_pair, π₂_pair] at l₁ r₁ l₂ r₂ outof_eq; subst_eqs; congr)
@@ -1242,7 +1237,6 @@ theorem mem_Int_empty_not_mem {x : ZFSet} {h : x ∈ Int} : ∅ ∉ x := by
 noncomputable section ZFIntEquivInt
 
 open Classical in
-
 /--
 This function maps `ZFInt` to `Int` by taking the first projection of the pair.
 -/
@@ -1269,15 +1263,18 @@ theorem ZFInt.into_inj_aux (x y : ZFInt) : into x = into y → x.out ≈ y.out :
   dsimp [into]
   obtain ⟨a, b⟩ := Quotient.out x
   obtain ⟨c, d⟩ := Quotient.out y
-  split_ifs with h₁ h₂ h₂ <;> (intro eq; simp at *)
+  split_ifs with h₁ h₂ h₂ <;>
+    (intro eq;
+     simp only [not_lt, Subtype.mk.injEq, pair_inj, SetLike.coe_eq_coe, true_and,
+       and_true] at *)
   · have := ZFNat.eq_add_of_sub_eq (hle := .inl h₁) (h := eq)
     rw [ZFNat.add_comm, ← ZFNat.add_sub_assoc (.inl h₂)] at this
     apply ZFNat.eq_add_of_sub_eq (h := this.symm)
     rw [ZFNat.add_comm]
     exact ZFNat.le_trans (.inl h₂) (ZFNat.le_add_right d a)
   · obtain ⟨eq₁, eq₂⟩ := eq
-    replace eq₁ : 0 = c - d := Subtype.eq eq₁
-    replace eq₂ : b - a = 0 := Subtype.eq eq₂
+    replace eq₁ : 0 = c - d := Subtype.ext eq₁
+    replace eq₂ : b - a = 0 := Subtype.ext eq₂
     have := ZFNat.le_antisymm (ZFNat.sub_eq_zero_imp_le.mp (eq₁.symm)) h₂
     subst this
     rw [eq₁] at eq₂
@@ -1287,8 +1284,8 @@ theorem ZFInt.into_inj_aux (x y : ZFInt) : into x = into y → x.out ≈ y.out :
     apply ZFNat.eq_add_of_sub_eq (h := eq₂)
     exact ZFNat.le_add_left c a
   · obtain ⟨eq₁, eq₂⟩ := eq
-    replace eq₁ : a - b = 0 := Subtype.eq eq₁
-    replace eq₂ : 0 = d - c := Subtype.eq eq₂
+    replace eq₁ : a - b = 0 := Subtype.ext eq₁
+    replace eq₂ : 0 = d - c := Subtype.ext eq₂
     have := ZFNat.le_antisymm (ZFNat.sub_eq_zero_imp_le.mp eq₁) h₁
     subst this
     rw [eq₂] at eq₁
@@ -1352,7 +1349,7 @@ theorem ZFInt.outof_into (x : ZFInt) : outof (into x) = x := by
       have h_sub_zero : a - b = 0 :=
         Subtype.ext ((π₁_pair (a - b).1 (∅ : ZFSet)).symm.trans hcond.1)
       have h_le_ab : a ≤ b := ZFNat.sub_eq_zero_imp_le.mp h_sub_zero
-      have h_le_ba : b ≤ a := by push_neg at hab; exact hab
+      have h_le_ba : b ≤ a := by push Not at hab; exact hab
       have ha_eq_b : a = b := ZFNat.le_antisymm h_le_ab h_le_ba
       subst ha_eq_b
       refine sound ?_
@@ -1361,7 +1358,7 @@ theorem ZFInt.outof_into (x : ZFInt) : outof (into x) = x := by
         Subtype.ext (π₂_pair _ _)
       rw [hπ₂]
     · rw [dif_neg hcond]
-      push_neg at hab
+      push Not at hab
       -- Rewrite `π₁ (pair (a-b).1 ∅)` to `(a-b).1` via `simp` (which handles the dependent
       -- proof in the inner ZFNat subtype); then proof irrelevance makes `⟨(a-b).1, _⟩`
       -- definitionally `a - b`.

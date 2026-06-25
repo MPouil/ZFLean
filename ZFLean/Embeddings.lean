@@ -1,4 +1,17 @@
+/-
+Copyright (c) 2025 Vincent Trélat. All rights reserved.
+Released under Apache 2.0 license as described in the file LICENSE.
+Authors: Vincent Trélat
+-/
 import ZFLean.Functions
+
+/-!
+# Embeddings between ZF sets
+
+This file defines embeddings between `ZFSet`s as injective functions and establishes
+their basic properties: reflexivity, transitivity, and existence of embeddings between
+singletons and pairs.
+-/
 
 namespace ZFSet
 section Embeddings

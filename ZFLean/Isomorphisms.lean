@@ -1,4 +1,17 @@
+/-
+Copyright (c) 2025 Vincent Trélat. All rights reserved.
+Released under Apache 2.0 license as described in the file LICENSE.
+Authors: Vincent Trélat
+-/
 import ZFLean.Functions
+
+/-!
+# Isomorphisms of ZF sets
+
+This file develops the theory of isomorphisms (bijections) between ZF sets, including the
+Cantor–Bernstein theorem, isomorphism stability under products, powersets and function spaces,
+and currying/uncurrying.
+-/
 
 namespace ZFSet
 
@@ -8,7 +21,7 @@ def isIso (A B : ZFSet) : Prop :=
   ∃ (bij : ZFSet) (is_func : A.IsFunc B bij), bij.IsBijective is_func
 infix:40 " ≅ᶻ " => ZFSet.isIso
 
-theorem isIso_refl : Reflexive ZFSet.isIso :=
+theorem isIso_refl : ∀ A, ZFSet.isIso A A :=
   fun A ↦ ⟨A.Id, Id.IsFunc, Id.IsBijective⟩
 
 instance : Trans ZFSet.isIso ZFSet.isIso ZFSet.isIso where
@@ -20,16 +33,16 @@ instance : Trans ZFSet.isIso ZFSet.isIso ZFSet.isIso where
     exists bij'', ZFSet.IsFunc_of_composition_IsFunc is_func' is_func
     exact ZFSet.IsBijective.composition_of_bijective is_bij is_bij'
 
-theorem isIso_symm : Symmetric ZFSet.isIso := by
+theorem isIso_symm : ∀ ⦃x y⦄, ZFSet.isIso x y → ZFSet.isIso y x := by
   intro x y iso
   obtain ⟨bij, is_func, is_bij⟩ := iso
   have := is_func.1
   use bij⁻¹, ?_
   exact inv_bijective_of_bijective is_bij
-instance : IsSymm ZFSet isIso where
+instance : Std.Symm isIso where
   symm := isIso_symm
 
-theorem isIso_trans : Transitive ZFSet.isIso := by
+theorem isIso_trans : ∀ ⦃x y z⦄, ZFSet.isIso x y → ZFSet.isIso y z → ZFSet.isIso x z := by
   intro x y z x_iso_y y_iso_z
   obtain ⟨bij, is_func, is_bij⟩ := x_iso_y
   obtain ⟨bij', is_func', is_bij'⟩ := y_iso_z
@@ -57,7 +70,6 @@ theorem bijective_of_injective_on_subset {A B : ZFSet}
   (B_sub : B ⊆ A) {u : ZFSet} {hu : A.IsFunc B u} (u_inj : IsInjective u) :
     ∃ (v : ZFSet) (hv : A.IsFunc B v), IsBijective v := by
   let C₀ := A \ B
-
   have C_sub {n} : C A B u n ⊆ A := by
     induction n with
     | zero =>
@@ -68,20 +80,18 @@ theorem bijective_of_injective_on_subset {A B : ZFSet}
       intro x x_mem_C
       rw [C, mem_sep] at x_mem_C
       exact B_sub x_mem_C.1
-
   let v := λᶻ : A → B
               | x ↦ if mem_Cn : ∃ n, x ∈ C A B u n then @ᶻu ⟨x, by
                       rw [is_func_dom_eq hu]
                       obtain ⟨_, x_mem_Cn⟩ := mem_Cn
                       apply C_sub x_mem_Cn⟩
                     else x
-
   have hv : A.IsFunc B v := by
     apply lambda_isFunc
     intro x xA
     split_ifs with mem_Cn
     · apply fapply_mem_range
-    · push_neg at mem_Cn
+    · push Not at mem_Cn
       specialize mem_Cn 0
       rw [C, mem_sdiff, not_and, not_not] at mem_Cn
       exact mem_Cn xA
@@ -98,25 +108,24 @@ theorem bijective_of_injective_on_subset {A B : ZFSet}
     · generalize_proofs u_pfun u_rel x_dom at eq
       subst y
       obtain ⟨n, mem_x⟩ := mem_x
-      push_neg at mem_y
+      push Not at mem_y
       specialize mem_y (n+1)
       rw [C, mem_sep, not_and] at mem_y
       specialize mem_y hz
-      push_neg at mem_y
+      push Not at mem_y
       specialize mem_y x mem_x
       nomatch mem_y <| fapply.def u_pfun x_dom
     · generalize_proofs u_pfun u_rel y_dom at eq
       subst z
       obtain ⟨n, mem_y⟩ := mem_y
-      push_neg at mem_x
+      push Not at mem_x
       specialize mem_x (n+1)
       rw [C, mem_sep, not_and] at mem_x
       specialize mem_x hz
-      push_neg at mem_x
+      push Not at mem_x
       specialize mem_x y mem_y
       nomatch mem_x <| fapply.def u_pfun y_dom
     · exact eq
-
   have v_surj : IsSurjective v := by classical
     intro y yB
     by_cases y_mem_C : ∃ n, y ∈ C A B u n
@@ -164,14 +173,11 @@ theorem isIso_of_biembedding {E F f g : ZFSet} {hf : E.IsFunc F f}
     obtain rfl := g_inj x' y' z hx' hy' (B_sub hz) x'_z_g y'_z_g
     exact f_inj x y x' hx hy hx' x_x'_f y_y'_f
   obtain ⟨v, hv, bij⟩ := bijective_of_injective_on_subset B_sub u_inj
-
   have hg' : F.IsFunc B g := IsFunc.is_func_on_range hg
   have g_bij : IsBijective g hg' := bijective_of_injective hg g_inj
   have h_v_hinv : E.IsFunc F (composition (inv g hg'.1) v E B F) :=
     IsFunc_of_composition_IsFunc (inv_is_func_of_bijective g_bij) hv
-
   use composition (inv g hg'.1) v E B F, h_v_hinv
-
   exact IsBijective.composition_of_bijective bij (inv_bijective_of_bijective g_bij)
 
 alias schroeder_bernstein := isIso_of_biembedding
@@ -190,7 +196,6 @@ theorem isIso_of_prod {A B C D : ZFSet} (h : A ≅ᶻ C) (h' : B ≅ᶻ D) : A.p
       rw [pair_inj] at ab_eq cd_eq
       rcases ab_eq with ⟨rfl, rfl⟩
       rcases cd_eq with ⟨rfl, rfl⟩
-
       obtain ⟨⟨⟨a', ha', b', hb', rfl⟩, -⟩, _, _, _, _, ⟨a'b'_eq, cd_eq⟩, a'c_f₁, b'd_f₂⟩ := ha'b'cd
       rw [pair_inj] at a'b'_eq cd_eq
       rcases a'b'_eq with ⟨rfl, rfl⟩
@@ -250,11 +255,11 @@ theorem inv_Image_of_bijective {f A B : ZFSet} {hf : A.IsFunc B f}
     f⁻¹[(f[X])] = X := by
   ext1 x
   constructor <;> intro hx
-  · simp [mem_Image, mem_inv] at hx
+  · simp only [mem_Image, mem_inv] at hx
     obtain ⟨xA, y, ⟨yB, u, uX, fuy⟩, fxy⟩ := hx
     obtain rfl := bij.1 u x y (hf.1 fuy |> pair_mem_prod.mp |>.1) xA yB fuy fxy
     exact uX
-  · simp [mem_Image, mem_inv]
+  · simp only [mem_Image, mem_inv]
     and_intros
     · exact hX hx
     · obtain ⟨y, yB, -⟩ := hf.2 x (hX hx)
@@ -288,12 +293,10 @@ theorem IsInjective_of_left_inverse {A B : ZFSet} {f : ZFSet}
   have y_y : y.pair y ∈ g ∘ᶻ f := by
     rw [left_inv]
     exact pair_self_mem_Id hy
-
   simp only [composition, mem_sep, mem_prod, pair_inj, exists_eq_right_right', and_self,
     existsAndEq, and_true, exists_eq_left'] at x_x y_y
   obtain ⟨-, x', hx', x_x'_f, x'_x_g⟩ := x_x
   obtain ⟨-, y', hy', y_y'_f, y'_y_g⟩ := y_y
-
   obtain rfl : x' = y' := by
     trans z
     · apply hf.2 x hx |>.unique
@@ -384,7 +387,6 @@ theorem isIso_powerset {A B : ZFSet} (h : A ≅ᶻ B) : A.powerset ≅ᶻ B.powe
           exact hy.1
         · exact hX
         · rw [inv_Image_of_bijective bij (mem_powerset.mp hX)]
-
   have right_inv : F ∘ᶻ F' = 𝟙B.powerset := by
     ext1 X
     rw [fcomp, composition, mem_sep, mem_prod]
@@ -445,7 +447,6 @@ theorem isIso_funs_to_pow_rel {A B : ZFSet} : A.funs B.powerset ≅ᶻ (A.prod B
                                         | a ↦ if ha : a ∈ A then
                                                 B.sep fun b ↦ (a.pair b ∈ R) -- {b ∈ B | (a, b) ∈ R}
                                               else ∅
-
   have hF : (A.funs B.powerset).IsFunc (A.prod B).powerset F := by
     apply lambda_isFunc
     intro f hf
@@ -462,7 +463,6 @@ theorem isIso_funs_to_pow_rel {A B : ZFSet} : A.funs B.powerset ≅ᶻ (A.prod B
     rw [dite_cond_eq_true (eq_true ha)]
     apply sep_mem_powerset
     rw [mem_powerset]
-
   apply isIso_of_two_sided_inverse (f := F) (g := G)
   · ext1 f
     simp only [mem_composition, mem_funs, mem_powerset, mem_Id_iff]
@@ -624,7 +624,8 @@ theorem isIso_funs_to_pow_rel {A B : ZFSet} : A.funs B.powerset ≅ᶻ (A.prod B
                 use ⟨ha, hb⟩
                 rw [fapply]
                 generalize_proofs choose₁ choose₂
-                simp [fapp_eq] at *
+                simp only [fapp_eq, dite_eq_ite, pair_inj, exists_eq_right_right',
+                  π₁_pair, mem_sep, mem_powerset, and_imp] at *
                 clear fapp_eq
                 generalize_proofs choose₃
                 have choose₃_spec := choose_spec choose₃
@@ -638,7 +639,6 @@ theorem isIso_funs_to_pow_rel {A B : ZFSet} : A.funs B.powerset ≅ᶻ (A.prod B
                 have choose₁_spec := choose_spec choose₁
                 have choose₂_spec := choose_spec choose₂
                 have choose₁_eq := choose₁_spec.2 |> lambda_spec.mp |>.2.2
-
                 conv at choose₂_spec =>
                   enter [2,1]
                   rw [choose₁_eq]
@@ -658,7 +658,6 @@ theorem isIso_funs_to_pow_rel {A B : ZFSet} : A.funs B.powerset ≅ᶻ (A.prod B
                 apply sep_mem_powerset
                 rw [mem_powerset]
               · rwa [mem_powerset]
-
   · exact hF
   · exact hG
 
@@ -667,7 +666,6 @@ theorem isIso_of_funs {A B C D : ZFSet} (h : A ≅ᶻ C) (h' : B ≅ᶻ D) : A.f
   obtain ⟨F, hF, Fbij⟩ := h
   have : F⁻¹ ⊆ C.prod A := by apply subset_prod_inv
   obtain ⟨G, hG, Gbij⟩ := h'
-
   let ξ := λᶻ : (A.funs B) → (C.funs D)
               |     f      ↦ if hf : f ⊆ A.prod B then
                               λᶻ: C → D
@@ -816,7 +814,7 @@ theorem isIso_of_funs {A B C D : ZFSet} (h : A ≅ᶻ C) (h' : B ≅ᶻ D) : A.f
         rw [←b_def, ←d_def] at db_G
         have b_eq := fapply.of_pair (is_func_is_pfunc Ginv_isfunc) db_G
         rw [Subtype.ext_iff] at b_eq
-        simp [d_eq] at b_eq
+        simp only [d_eq] at b_eq
         rw [←fapply_composition Ginv_isfunc hG (fapply_mem_range g'pfunc a_g'dom)] at b_eq
         conv at b_eq =>
           unfold fapply
@@ -996,19 +994,15 @@ theorem ZFNat.iso_eq_iff {n m : ZFNat} : ↑n ≅ᶻ ↑m ↔ n = m where
       nomatch notMem_empty x contr
     | succ n ih =>
       obtain ⟨f, isfunc, bij⟩ := iso
-
       obtain ⟨ℓ, hℓ, ℓ_unq⟩ := isfunc.2 ↑n <| add_one_eq_succ ▸ lt_succ
       have ℓ_mem_m := isfunc.1 hℓ |> pair_mem_prod.mp |>.2
-
       obtain ⟨k, rfl⟩ : ∃ k, m = k + 1 := by
         simp_rw [ZFNat.add_one_eq_succ]
         apply ZFNat.not_zero_imp_succ
         rintro rfl
         nomatch notMem_empty _ ℓ_mem_m
-
       rw [add_right_cancel]
       apply ih
-
       let f' := ZFSet.prod ↑n (↑(k+1) \ {ℓ}) |>.sep (· ∈ f)
       have : IsFunc ↑n (↑(k+1) \ {ℓ}) f' := by
         and_intros
@@ -1124,7 +1118,6 @@ theorem ZFNat.iso_eq_iff {n m : ZFNat} : ↑n ≅ᶻ ↑m ↔ n = m where
               exists_eq_right_right', π₁_pair, π₂_pair] at g_xz g_yz
             obtain ⟨⟨mem_x_k, mem_z_succ_k, z_ne_ℓ⟩, z_eq⟩ := g_xz
             obtain ⟨⟨mem_y_k, -, -⟩, z_eq'⟩ := g_yz
-
             -- reason into naturals
             have z_Nat : z ∈ Nat := mem_Nat_of_mem_mem_Nat (k.succ.prop) (by
               rwa [add_one_eq_succ] at mem_z_succ_k)
@@ -1136,7 +1129,6 @@ theorem ZFNat.iso_eq_iff {n m : ZFNat} : ↑n ≅ᶻ ↑m ↔ n = m where
             let X : ZFNat := ⟨x, x_Nat⟩
             let Y : ZFNat := ⟨y, y_Nat⟩
             let L : ZFNat := ⟨ℓ, ℓ_Nat⟩
-
             split_ifs at z_eq z_eq' with x_mem_ℓ y_mem_ℓ y_lt_ℓ
             · subst x y
               rfl
@@ -1177,7 +1169,6 @@ theorem ZFNat.iso_eq_iff {n m : ZFNat} : ↑n ≅ᶻ ↑m ↔ n = m where
             · apply succ_inj_aux'
               rw [←z_eq, ←z_eq']
           · intro y hy
-
             -- reason into naturals
             have y_Nat : y ∈ Nat := by
               apply mem_Nat_of_mem_mem_Nat (k.succ.prop)
@@ -1239,7 +1230,6 @@ theorem ZFNat.iso_eq_iff {n m : ZFNat} : ↑n ≅ᶻ ↑m ↔ n = m where
                 change Y < k at y_mem_k
                 rw [not_lt] at y_lt_ℓ
                 rw [←ne_eq, ne_comm, ne_eq] at y_ne_ℓ
-
                 have := ZFNat.not_zero_imp_succ (n := Y) ?_
                 · obtain ⟨s, Y_eq⟩ := this
                   use s
@@ -1514,7 +1504,6 @@ theorem isIso_curry {A B C : ZFSet} :
     intro g hg
     rw [dite_cond_eq_true (eq_true hg), mem_funs]
     apply uncurrify_is_func
-
   have l_inv : (uncurry ∘ᶻ curry) = 𝟙((A.prod B).funs C) := by
     rw [is_func_ext_iff (IsFunc_of_composition_IsFunc huncurry hcurry) Id.IsFunc]
     intro f hf
@@ -1540,7 +1529,6 @@ theorem isIso_curry {A B C : ZFSet} :
             ) hf,
           dite_cond_eq_true (eq_true hf)]
       rw [uncurrify_of_currify f (mem_funs.mp hf)]
-
   have r_inv : (curry ∘ᶻ uncurry) = 𝟙(A.funs (B.funs C)) := by
     rw [is_func_ext_iff (IsFunc_of_composition_IsFunc hcurry huncurry) Id.IsFunc]
     intro g hg
@@ -1566,7 +1554,6 @@ theorem isIso_curry {A B C : ZFSet} :
             ) hg,
           dite_cond_eq_true (eq_true hg)]
       rw [currify_of_uncurrify g (mem_funs.mp hg)]
-
   exact isIso_of_two_sided_inverse l_inv r_inv
 
 end Lemmas

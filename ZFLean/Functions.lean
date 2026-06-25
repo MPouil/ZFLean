@@ -1,6 +1,19 @@
+/-
+Copyright (c) 2025 Vincent Trélat. All rights reserved.
+Released under Apache 2.0 license as described in the file LICENSE.
+Authors: Vincent Trélat
+-/
 import ZFLean.Rationals
 import ZFLean.Booleans
 import ZFLean.Tactics
+
+/-!
+# Functions and relations on ZF sets
+
+This file develops binary relations, partial and total functions, composition, identity,
+injectivity/surjectivity/bijectivity, permutations, lambda abstraction and function application
+on the encoded `ZFSet` universe, together with order-theoretic notions on subsets.
+-/
 
 namespace ZFSet
 set_option linter.unusedVariables false
@@ -672,6 +685,9 @@ theorem fapply.def {f A B : ZFSet} (hf : f.IsPFunc A B) {x : ZFSet} (hx : x ∈ 
   generalize_proofs y_def
   exact Classical.choose_spec y_def |>.2
 
+-- This proof relies on `fapply._proof_1`, the auto-generated existence proof inside `fapply`,
+-- to relate the two `Classical.choose` terms; the auxLemma linter is disabled locally for it.
+set_option linter.auxLemma false in
 theorem IsInjective.apply_inj {f A B : ZFSet} (hf : IsFunc A B f) (inj : f.IsInjective) :
     Function.Injective @ᶻf := by classical
   rintro ⟨x, x_dom⟩ ⟨y, y_dom⟩ h
@@ -1449,6 +1465,7 @@ noncomputable def Max (S : ZFSet) [linord : LinearOrder {x // x ∈ S}] : ZFSet 
 noncomputable def Min (S : ZFSet) [linord : LinearOrder {x // x ∈ S}] : ZFSet :=
   ε (S.sep fun x ↦ (_ : x ∈ S) → ∀ y, (_ : y ∈ S) → linord.le ⟨x, ‹_›⟩ ⟨y, ‹_›⟩)
 
+@[reducible]
 def LinearOrder.ofSubset {S T : ZFSet} (S_T : S ⊆ T) [linordT : LinearOrder {x // x ∈ T}] :
     LinearOrder {x // x ∈ S} :=
   LinearOrder.lift'
@@ -1534,7 +1551,7 @@ theorem isTuple_pair {a b : ZFSet} : hasArity (ZFSet.pair a b) 2 := by
   rw [hasArity]
   · split_ifs with cond
     · trivial
-    · push_neg at cond
+    · push Not at cond
       nomatch cond a b
   · rintro ⟨⟩
 
@@ -2477,7 +2494,6 @@ theorem Min_mem_of_non_empty_finite {S : ZFSet} [inst : LinearOrder {x // x ∈ 
   apply epsilon_spec ?_
     (p := fun z ↦
       z ∈ S ∧ ∀ (x : z ∈ S) (y : ZFSet.{u_1}) (x_1 : y ∈ S), inst.le ⟨z, x⟩ ⟨y, x_1⟩) |>.1
-  beta_reduce
   obtain ⟨n, f, hn, hf, bij, mono⟩ :=
     IsFinite.exists_bij_mono_iff (inst := inst.toPreorder).mp S_fin
   have : n ≠ (0 : ZFNat).1 := by
@@ -2515,14 +2531,12 @@ theorem Min_mem_of_non_empty_finite {S : ZFSet} [inst : LinearOrder {x // x ∈ 
   have x₀_S : x₀ ∈ S := by
     rw [mem_sep] at x₀_dom
     exact x₀_dom.1
-
   by_contra! contr
   specialize contr x₀ x₀_S
   obtain ⟨_, x₁, x₁_S, x₁_lt_x₀⟩ := contr
   obtain ⟨y₁, y₁_def, -⟩ := hf.2 x₁ x₁_S
   have := IsPFunc.mem_range_of_mem (is_func_is_pfunc hf) y₁_def
   rw [IsFunc.range_eq_of_surjective hf bij.2] at this
-
   unfold IsStrictMono at mono
   have : (⟨y₁, ZFNat.mem_Nat_of_mem_mem_Nat hn this⟩ : ZFNat) < 0 := by
     specialize mono x₁ x₀ y₁ (0:ZFNat) x₁_S this y₁_def x₀_S _ x₀_def _
@@ -2571,7 +2585,6 @@ theorem fprod_is_func {A B A' B' φ ψ : ZFSet} (hφ : A.IsFunc A' φ) (hψ : B.
     obtain ⟨rfl, rfl⟩ := eq
     let φa : ZFSet := @ᶻφ ⟨a, by rwa [is_func_dom_eq hφ]⟩
     let ψb : ZFSet := @ᶻψ ⟨b, by rwa [is_func_dom_eq hψ]⟩
-
     simp only [mem_prod, pair_inj, exists_eq_right_right', π₁_pair, π₂_pair]
     and_intros
     · exact aA
@@ -2731,7 +2744,6 @@ theorem composition_fprod_Image_bijective {A B A' B' φ ψ : ZFSet}
   (φ_bij : φ.IsBijective) (ψ_bij : ψ.IsBijective) :
     let φ_ψ : ZFSet := fprod φ ψ
     have φ_ψ_bij : φ_ψ.IsBijective := fprod_bijective_of_bijective φ_bij ψ_bij
-
     let Φ : ZFSet := λᶻ : (A.prod B).powerset → (A'.prod B').powerset
                         |                   S ↦ φ_ψ[S]
     ∃ (hΦ : (A.prod B).powerset.IsFunc (A'.prod B').powerset Φ), IsBijective Φ hΦ := by

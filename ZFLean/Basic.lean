@@ -1,4 +1,17 @@
+/-
+Copyright (c) 2025 Vincent Trélat. All rights reserved.
+Released under Apache 2.0 license as described in the file LICENSE.
+Authors: Vincent Trélat
+-/
 import Mathlib.SetTheory.ZFC.Basic
+
+/-!
+# Basic ZFSet lemmas
+
+This file develops elementary lemmas about `ZFSet`, including characterizations of the
+empty set, separation, and the behavior of unions and intersections.
+-/
+
 noncomputable section
 
 namespace ZFSet
@@ -6,7 +19,7 @@ namespace ZFSet
 theorem nonempty_exists_iff {n : ZFSet} : n ≠ ∅ ↔ ∃ m, m ∈ n := by
   simp [ZFSet.ext_iff]
 
-@[simp] theorem subset_of_empty {x : ZFSet} (h : x ⊆ ∅) : x = ∅ := by
+theorem subset_of_empty {x : ZFSet} (h : x ⊆ ∅) : x = ∅ := by
   ext1 z
   constructor
   · intro hz

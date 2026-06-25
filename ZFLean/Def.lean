@@ -1,3 +1,8 @@
+/-
+Copyright (c) 2025 Vincent Trélat. All rights reserved.
+Released under Apache 2.0 license as described in the file LICENSE.
+Authors: Vincent Trélat
+-/
 import ZFLean.Basic
 import Mathlib.SetTheory.ZFC.Class
 import Mathlib.Algebra.Ring.Basic
@@ -6,6 +11,13 @@ import Mathlib.Tactic.Contrapose
 import Mathlib.Tactic.Ring
 import Mathlib.Data.Finite.Defs
 -- import Extra.Utils
+
+/-!
+# Core definitions for ZFC set theory
+
+This file develops basic definitions and lemmas over `ZFSet`, including transitive and
+inductive sets, the symmetric difference, and assorted membership and monotonicity results.
+-/
 
 noncomputable section
 
