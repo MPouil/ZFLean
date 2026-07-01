@@ -1,7 +1,21 @@
+/-
+Copyright (c) 2025 Vincent Trélat. All rights reserved.
+Released under Apache 2.0 license as described in the file LICENSE.
+Authors: Vincent Trélat
+-/
 import ZFLean.Basic
 import ZFLean.Booleans
 import ZFLean.Integers
 import ZFLean.Functions
+
+/-!
+# Disjoint sums and options over ZF sets
+
+This file defines the disjoint sum `A ⊎ B` of two `ZFSet`s as a subtype, with
+constructors, eliminators, and an equivalence to the type-level sum. It also develops
+`Option S` together with bijections relating it to `_root_.Option` and a lifting of
+functions to options.
+-/
 
 namespace ZFSet
 
@@ -154,7 +168,7 @@ theorem casesOn_of_inr {A B : ZFSet} {motive : A ⊎ B → Sort*} (a : {x // x �
   · rw [inr, π₁_pair]
     exact zftrue_ne_zffalse
 
-noncomputable instance {A B : ZFSet} : A ⊎ B ≃ ({x // x ∈ A} ⊕ {x // x ∈ B}) where
+noncomputable def equivSum {A B : ZFSet} : A ⊎ B ≃ ({x // x ∈ A} ⊕ {x // x ∈ B}) where
   toFun x := by
     cases x with
     | inl a => exact _root_.Sum.inl a
@@ -296,7 +310,7 @@ noncomputable def EmbeddingZFOptionOption {T : ZFSet} : Option T ↪ _root_.Opti
   toFun := into
   inj' := into.inj
 
-noncomputable instance instEquivZFOptionOption {T : ZFSet} :
+noncomputable def instEquivZFOptionOption {T : ZFSet} :
     Option T ≃ _root_.Option {x // x ∈ T} where
   toFun := into
   invFun := Function.invFun into
@@ -354,7 +368,7 @@ def EmbeddingOptionZFOption {T : ZFSet} : _root_.Option {x // x ∈ T} ↪ Optio
   toFun := outof
   inj' := outof.inj
 
-noncomputable instance instEquivOptionZFOption {T : ZFSet} :
+noncomputable def instEquivOptionZFOption {T : ZFSet} :
     _root_.Option {x // x ∈ T} ≃ Option T where
   toFun := outof
   invFun := Function.invFun outof

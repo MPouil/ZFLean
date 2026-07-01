@@ -1,6 +1,19 @@
+/-
+Copyright (c) 2025 Vincent Trélat. All rights reserved.
+Released under Apache 2.0 license as described in the file LICENSE.
+Authors: Vincent Trélat
+-/
 import ZFLean.Rationals
 import ZFLean.Booleans
 import ZFLean.Tactics
+
+/-!
+# Functions and relations on ZF sets
+
+This file develops binary relations, partial and total functions, composition, identity,
+injectivity/surjectivity/bijectivity, permutations, lambda abstraction and function application
+on the encoded `ZFSet` universe, together with order-theoretic notions on subsets.
+-/
 
 namespace ZFSet
 set_option linter.unusedVariables false
@@ -672,6 +685,9 @@ theorem fapply.def {f A B : ZFSet} (hf : f.IsPFunc A B) {x : ZFSet} (hx : x ∈ 
   generalize_proofs y_def
   exact Classical.choose_spec y_def |>.2
 
+-- This proof relies on `fapply._proof_1`, the auto-generated existence proof inside `fapply`,
+-- to relate the two `Classical.choose` terms; the auxLemma linter is disabled locally for it.
+set_option linter.auxLemma false in
 theorem IsInjective.apply_inj {f A B : ZFSet} (hf : IsFunc A B f) (inj : f.IsInjective) :
     Function.Injective @ᶻf := by classical
   rintro ⟨x, x_dom⟩ ⟨y, y_dom⟩ h
@@ -1449,6 +1465,7 @@ noncomputable def Max (S : ZFSet) [linord : LinearOrder {x // x ∈ S}] : ZFSet 
 noncomputable def Min (S : ZFSet) [linord : LinearOrder {x // x ∈ S}] : ZFSet :=
   ε (S.sep fun x ↦ (_ : x ∈ S) → ∀ y, (_ : y ∈ S) → linord.le ⟨x, ‹_›⟩ ⟨y, ‹_›⟩)
 
+@[reducible]
 def LinearOrder.ofSubset {S T : ZFSet} (S_T : S ⊆ T) [linordT : LinearOrder {x // x ∈ T}] :
     LinearOrder {x // x ∈ S} :=
   LinearOrder.lift'
@@ -1534,7 +1551,7 @@ theorem isTuple_pair {a b : ZFSet} : hasArity (ZFSet.pair a b) 2 := by
   rw [hasArity]
   · split_ifs with cond
     · trivial
-    · push_neg at cond
+    · push Not at cond
       nomatch cond a b
   · rintro ⟨⟩
 
@@ -1698,9 +1715,10 @@ theorem IsFunc.range_eq_of_surjective {f A B : ZFSet} (hf : IsFunc A B f)
       · exact ZFSet.mem_dom (is_func_is_pfunc hf) xy
       · exact xy
 
-attribute [-instance] SetLike.instPartialOrder
+attribute [-instance] ZFSet.instPartialOrder
 
-instance instPreorder_mem_Nat {n : ZFSet} (hn : n ∈ Nat) : Preorder {x // x ∈ n} where
+@[reducible]
+def instPreorder_mem_Nat {n : ZFSet} (hn : n ∈ Nat) : Preorder {x // x ∈ n} where
   le := fun ⟨a, ha⟩ ⟨b, hb⟩ ↦
     (⟨a, ZFNat.mem_Nat_of_mem_mem_Nat hn ha⟩ : ZFNat) ≤
     (⟨b, ZFNat.mem_Nat_of_mem_mem_Nat hn hb⟩ : ZFNat)
@@ -1986,7 +2004,7 @@ theorem IsFinite.union {A B : ZFSet} (finA : A.IsFinite) (finB : B.IsFinite) :
   (A ∪ B).IsFinite := by
   have : A ∪ B = (A \ B) ∪ B := by
     ext1 z
-    simp_rw [mem_union, mem_diff]
+    simp_rw [mem_union, mem_sdiff]
     constructor
     · rintro (hA | hB)
       · by_cases hB : z ∈ B
@@ -1999,11 +2017,11 @@ theorem IsFinite.union {A B : ZFSet} (finA : A.IsFinite) (finB : B.IsFinite) :
   rw [this]
   have : (A \ B) ∩ B = ∅ := by
     ext1 z
-    rw [mem_inter, mem_diff, and_assoc]
+    rw [mem_inter, mem_sdiff, and_assoc]
     simp only [not_and_self, and_false, notMem_empty]
   apply IsFinite.disjoint_union (IsFinite.subset finA ?_) finB this
   intro z hz
-  rw [mem_diff] at hz
+  rw [mem_sdiff] at hz
   exact hz.1
 
 theorem IsFinite.inter {A B : ZFSet} (fin : A.IsFinite ∨ B.IsFinite) :
@@ -2021,7 +2039,7 @@ theorem IsFinite.diff {A B : ZFSet} (finA : A.IsFinite) :
   (A \ B).IsFinite := by
   apply IsFinite.subset finA
   intro z hz
-  rw [mem_diff] at hz
+  rw [mem_sdiff] at hz
   exact hz.1
 
 @[induction_eliminator]
@@ -2054,7 +2072,7 @@ def ZFFinSet.inductionOn {P : ZFFinSet → Prop}
         and_intros
         · intro z hz
           unfold fS' at hz
-          rw [mem_diff, mem_singleton] at hz
+          rw [mem_sdiff, mem_singleton] at hz
           obtain ⟨x, xS, y, yS, rfl⟩ := mem_prod.mp <| fS_fun.1 hz.1
           rw [pair_inj] at hz
           rw [pair_mem_prod]
@@ -2065,7 +2083,7 @@ def ZFFinSet.inductionOn {P : ZFFinSet → Prop}
             nomatch hz.2 (pair_inj.mp rfl)
           · and_intros
             · unfold S'
-              rw [mem_diff, mem_singleton]
+              rw [mem_sdiff, mem_singleton]
               and_intros
               · exact xS
               · rintro rfl
@@ -2076,13 +2094,13 @@ def ZFFinSet.inductionOn {P : ZFFinSet → Prop}
                 nomatch mem_irrefl _ yS
             · exact yS
         · intro z zS
-          rw [mem_diff, mem_singleton] at zS
+          rw [mem_sdiff, mem_singleton] at zS
           obtain ⟨w, hw, w_unq⟩ := fS_fun.2 z zS.1
           exists w
           and_intros
           · unfold fS'
             beta_reduce
-            rw [mem_diff, mem_singleton, pair_inj]
+            rw [mem_sdiff, mem_singleton, pair_inj]
             and_intros
             · exact hw
             · rw [not_and_or]
@@ -2090,24 +2108,24 @@ def ZFFinSet.inductionOn {P : ZFFinSet → Prop}
               exact zS.2
           · intro w' hw'
             unfold fS' at hw'
-            rw [mem_diff, mem_singleton, pair_inj] at hw'
+            rw [mem_sdiff, mem_singleton, pair_inj] at hw'
             exact w_unq w' hw'.left
       have : fS'.IsInjective := by
         intro x y z xS' yS' zn xy yz
         apply fS_inj x y z
-        · exact mem_diff.mp xS' |>.1
-        · exact mem_diff.mp yS' |>.1
+        · exact mem_sdiff.mp xS' |>.1
+        · exact mem_sdiff.mp yS' |>.1
         · exact mem_insert_of_mem n zn
         all_goals
           unfold fS' at xy
-          rw [mem_diff, mem_singleton] at xy yz
+          rw [mem_sdiff, mem_singleton] at xy yz
         · exact xy.1
         · exact yz.1
       specialize IH S' fS' (mem_funs.mpr S'_is_func) S'_fin S'_is_func this
       have : S = Insert.insert a S' := by classical
         unfold S'
         ext1 z
-        simp_rw [mem_insert_iff, mem_diff, mem_singleton, or_and_left, Classical.em, and_true]
+        simp_rw [mem_insert_iff, mem_sdiff, mem_singleton, or_and_left, Classical.em, and_true]
         constructor
         · exact Or.inr
         · rintro (rfl | hz)
@@ -2115,7 +2133,7 @@ def ZFFinSet.inductionOn {P : ZFFinSet → Prop}
           · exact hz
       specialize insert _ a IH (by
         unfold S'
-        rw [mem_diff, mem_singleton, not_and_or, not_not]
+        rw [mem_sdiff, mem_singleton, not_and_or, not_not]
         right; rfl)
       conv at insert =>
         enter [1,1]
@@ -2427,7 +2445,7 @@ theorem IsFinite.powerset {A : ZFSet} (finA : A.IsFinite) : A.powerset.IsFinite 
       specialize IH ⟨S \ ({s} : ZFSet), IsFinite.diff finA⟩
       have : S.val = Insert.insert s (S.val \ ({s} : ZFSet)) := by
         ext
-        simp only [mem_insert_iff, mem_diff, mem_singleton, or_and_left,
+        simp only [mem_insert_iff, mem_sdiff, mem_singleton, or_and_left,
           Classical.em, and_true, iff_or_self]
         rintro rfl
         assumption
@@ -2439,7 +2457,7 @@ theorem IsFinite.powerset {A : ZFSet} (finA : A.IsFinite) : A.powerset.IsFinite 
       rw [this] at cardS
       dsimp at cardS
       have := Card.insert (S := ⟨S.val \ ({s} : ZFSet), IsFinite.diff finA⟩) (x := s) (by
-        rw [mem_diff, mem_singleton, not_and_or, not_not]
+        rw [mem_sdiff, mem_singleton, not_and_or, not_not]
         right; rfl)
       rw [this, ZFNat.add_right_cancel] at cardS
       clear this
@@ -2476,7 +2494,6 @@ theorem Min_mem_of_non_empty_finite {S : ZFSet} [inst : LinearOrder {x // x ∈ 
   apply epsilon_spec ?_
     (p := fun z ↦
       z ∈ S ∧ ∀ (x : z ∈ S) (y : ZFSet.{u_1}) (x_1 : y ∈ S), inst.le ⟨z, x⟩ ⟨y, x_1⟩) |>.1
-  beta_reduce
   obtain ⟨n, f, hn, hf, bij, mono⟩ :=
     IsFinite.exists_bij_mono_iff (inst := inst.toPreorder).mp S_fin
   have : n ≠ (0 : ZFNat).1 := by
@@ -2514,14 +2531,12 @@ theorem Min_mem_of_non_empty_finite {S : ZFSet} [inst : LinearOrder {x // x ∈ 
   have x₀_S : x₀ ∈ S := by
     rw [mem_sep] at x₀_dom
     exact x₀_dom.1
-
   by_contra! contr
   specialize contr x₀ x₀_S
   obtain ⟨_, x₁, x₁_S, x₁_lt_x₀⟩ := contr
   obtain ⟨y₁, y₁_def, -⟩ := hf.2 x₁ x₁_S
   have := IsPFunc.mem_range_of_mem (is_func_is_pfunc hf) y₁_def
   rw [IsFunc.range_eq_of_surjective hf bij.2] at this
-
   unfold IsStrictMono at mono
   have : (⟨y₁, ZFNat.mem_Nat_of_mem_mem_Nat hn this⟩ : ZFNat) < 0 := by
     specialize mono x₁ x₀ y₁ (0:ZFNat) x₁_S this y₁_def x₀_S _ x₀_def _
@@ -2570,7 +2585,6 @@ theorem fprod_is_func {A B A' B' φ ψ : ZFSet} (hφ : A.IsFunc A' φ) (hψ : B.
     obtain ⟨rfl, rfl⟩ := eq
     let φa : ZFSet := @ᶻφ ⟨a, by rwa [is_func_dom_eq hφ]⟩
     let ψb : ZFSet := @ᶻψ ⟨b, by rwa [is_func_dom_eq hψ]⟩
-
     simp only [mem_prod, pair_inj, exists_eq_right_right', π₁_pair, π₂_pair]
     and_intros
     · exact aA
@@ -2730,7 +2744,6 @@ theorem composition_fprod_Image_bijective {A B A' B' φ ψ : ZFSet}
   (φ_bij : φ.IsBijective) (ψ_bij : ψ.IsBijective) :
     let φ_ψ : ZFSet := fprod φ ψ
     have φ_ψ_bij : φ_ψ.IsBijective := fprod_bijective_of_bijective φ_bij ψ_bij
-
     let Φ : ZFSet := λᶻ : (A.prod B).powerset → (A'.prod B').powerset
                         |                   S ↦ φ_ψ[S]
     ∃ (hΦ : (A.prod B).powerset.IsFunc (A'.prod B').powerset Φ), IsBijective Φ hΦ := by

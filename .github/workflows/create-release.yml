@@ -16,7 +16,10 @@ jobs:
       contents: write
     steps:
     - name: lean-release-tag action
-      uses: leanprover-community/lean-release-tag@v1
+      # Pinned to a fixed `main` commit: the `v1` branch lacks the null-`before` guard and
+      # crashes (`Invalid revision range 000…0..<sha>`) on the first push of a new branch,
+      # where `github.event.before` is the null SHA.
+      uses: leanprover-community/lean-release-tag@ee8ee743e5a36ff0e75ff51035f6a95a9d1bdf59
       with:
         do-release: true
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

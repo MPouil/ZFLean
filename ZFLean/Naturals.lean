@@ -340,8 +340,7 @@ theorem every_nat_transitive {n : ZFSet} (h : n ∈ Nat) : transitive n := by
   apply ind _ h
   · intros _ _
     exact False.elim (notMem_empty _ ‹_›)
-  · intros _ _ ih _ hy
-    intro _ _
+  · intros _ _ ih _ hy _ _
     rw [mem_insert_iff] at hy ⊢
     rcases hy with rfl | _
     · exact Or.inr ‹_›
@@ -375,7 +374,6 @@ theorem le_antisymm {x y : ZFNat} : x ≤ y → y ≤ x → x = y := by
   · trivial
 
 theorem lt_le_iff {n m} : n ≤ m ↔ n < succ m := by
-  dsimp [nat_le, ]
   apply Iff.intro
   · rintro (_ | rfl)
     · exact lt_trans ‹_› lt_succ
@@ -383,7 +381,7 @@ theorem lt_le_iff {n m} : n ≤ m ↔ n < succ m := by
   · intro h
     let ⟨n, hn⟩ := n
     let ⟨m, hm⟩ := m
-    dsimp [nat_lt, succ] at *
+    dsimp [LT.lt, nat_lt, succ] at *
     rw [mem_insert_iff] at h
     rcases h with rfl | _
     · right; rfl
@@ -490,7 +488,7 @@ theorem lt_iff_le_not_ge {x y : ZFNat} : x < y ↔ x ≤ y ∧ ¬ y ≤ x := by
       · exact lt_irrefl ‹_›
   · rintro ⟨h | rfl, h'⟩
     · assumption
-    · simp only [nat_le, or_true] at h'
+    · simp only [LE.le, or_true] at h'
       contradiction
 
 /-- The (strong) induction principle for natural numbers. -/
@@ -721,11 +719,11 @@ instance : LinearOrder ZFNat where
 
 instance : IsStrictTotalOrder ZFNat (·<·) where
   trichotomous x y := by
-    rcases @le_total x y with (h | rfl) | h | rfl
-    · left; assumption
-    · right; left; rfl
-    · right; right; assumption
-    · right; left; rfl
+    intros h₁ h₂
+    rcases @le_total x y with (h | rfl) | h | rfl <;>
+    first
+    | contradiction
+    | rfl
   irrefl _ := lt_irrefl
   trans _ _ _ := lt_trans
 
@@ -1552,7 +1550,7 @@ theorem ZFNat.toNat_iff {n m : ZFNat} : n = m ↔ n.toNat = m.toNat where
         obtain rfl := ih h
         rfl
 
-instance ZFNat.instEquivZFNat_Nat : ZFNat ≃ ℕ where
+def ZFNat.equivZFNat_Nat : ZFNat ≃ ℕ where
   toFun := toNat
   invFun := ofNat
   left_inv := by
