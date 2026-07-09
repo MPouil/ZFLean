@@ -544,50 +544,51 @@ noncomputable instance : Field ZFRat := {}
 
 section Order
 
-def lt (x y : ZFRat) : Prop :=
-  Quotient.liftOn₂ x y (fun ⟨a, b⟩ ⟨c, d⟩ ↦ a * d < c * b)
-    fun ⟨x₁, x₂, hx₂⟩ ⟨y₁, y₂, hy₂⟩ ⟨u₁, u₂, hu₂⟩ ⟨v₁, v₂, hv₂⟩ hxu hyv ↦ by
-      have h1 : x₁ * u₂ = x₂ * u₁ := hxu
-      have h2 : y₁ * v₂ = y₂ * v₁ := hyv
-      dsimp
-      ext
-      obtain u₂_neg | u₂_pos : u₂ < 0 ∨ 0 < u₂ := by
-        rcases lt_trichotomy u₂ 0 with h | rfl | h
-        · left; exact h
-        · contradiction
-        · right; exact h
-      all_goals
-        obtain v₂_neg | v₂_pos : v₂ < 0 ∨ 0 < v₂ := by
-          rcases lt_trichotomy v₂ 0 with h | rfl | h
-          · left; exact h
-          · contradiction
-          · right; exact h
-      all_goals
-        obtain x₂_neg | x₂_pos : x₂ < 0 ∨ 0 < x₂ := by
-          rcases lt_trichotomy x₂ 0 with h | rfl | h
-          · left; exact h
-          · contradiction
-          · right; exact h
-      all_goals
-        obtain y₂_neg | y₂_pos : y₂ < 0 ∨ 0 < y₂ := by
-          rcases lt_trichotomy y₂ 0 with h | rfl | h
-          · left; exact h
-          · contradiction
-          · right; exact h
-      all_goals constructor <;> intro h
-      · have : (x₁ * u₂) * (y₂ * v₂) < (y₁ * v₂) * (x₂ * u₂) := by
-          ac_change (x₁ * y₂) * (u₂ * v₂) < (y₁ * x₂) * (u₂ * v₂)
-          exact ZFInt.mul_lt_mul_of_pos_right h (ZFInt.mul_neg_neg_pos u₂ v₂ u₂_neg v₂_neg)
-        rw [h1, h2] at this
-        convert_to u₁ * v₂ * (y₂ * x₂) <  v₁ * u₂ * (y₂ * x₂) at this
-        · ac_rfl
-        · ac_rfl
-        · have mul_pos : 0 < y₂ * x₂ := ZFInt.mul_neg_neg_pos y₂ x₂ y₂_neg x₂_neg
-          rwa [mul_lt_mul_iff_of_pos_right mul_pos] at this
-      all_goals admit
+/-- A rational is positive iff numerator and denominator carry the same sign.
+Well-defined because for equivalent reps `(a,b) ≈ (c,d)` (i.e. `a*d = b*c`),
+multiplying both sides by `b*d` gives `(a*b)*(d*d) = (b*b)*(c*d)`, and `b*b`,
+`d*d` are both positive, so `a*b` and `c*d` share a sign. -/
+def isPos (x : ZFRat) : Prop :=
+  Quotient.liftOn x (fun ⟨a, b, _⟩ ↦ 0 < a * b)
+    fun ⟨a, b, hb⟩ ⟨c, d, hd⟩ h ↦ by
+      unfold_projs at h
+      simp only [ZFSet.qrel] at h
+      dsimp only
+      have hb2 : 0 < b * b := by
+        rcases lt_trichotomy b 0 with hb' | hb' | hb'
+        · exact ZFInt.mul_neg_neg_pos b b hb' hb'
+        · exact absurd hb' hb
+        · exact ZFInt.mul_pos_pos_pos b b hb' hb'
+      have hd2 : 0 < d * d := by
+        rcases lt_trichotomy d 0 with hd' | hd' | hd'
+        · exact ZFInt.mul_neg_neg_pos d d hd' hd'
+        · exact absurd hd' hd
+        · exact ZFInt.mul_pos_pos_pos d d hd' hd'
+      have key : (a * b) * (d * d) = (b * b) * (c * d) := by
+        ac_change (a * d) * (b * d) = (b * c) * (b * d)
+        rw [h]
+      apply propext
+      constructor
+      · intro hab
+        have h1 : 0 < (a * b) * (d * d) := ZFInt.mul_pos_pos_pos _ _ hab hd2
+        rw [key] at h1
+        exact ZFInt.pos_of_mul_pos h1 hb2
+      · intro hcd
+        have h1 : 0 < (b * b) * (c * d) := ZFInt.mul_pos_pos_pos _ _ hb2 hcd
+        rw [←key, ZFInt.mul_comm (a * b) (d * d)] at h1
+        exact ZFInt.pos_of_mul_pos h1 hd2
+
+def lt (x y : ZFRat) : Prop := isPos (y - x)
 
 instance : LT ZFRat where lt := lt
 instance : LE ZFRat where le x y := x < y ∨ x = y
+
+theorem isPos_eq (n : ZFInt × ZFInt') : isPos (mk n) ↔ 0 < n.1 * n.2 := Iff.rfl
+
+theorem lt_eq (n m : ZFInt × ZFInt') :
+    mk n < mk m ↔ 0 < (m.1 * n.2 - n.1 * m.2) * (m.2 * n.2) := by
+  change isPos (mk m - mk n) ↔ _
+  rw [sub_eq, isPos_eq]
 
 end Order
 
