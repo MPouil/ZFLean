@@ -544,50 +544,242 @@ noncomputable instance : Field ZFRat := {}
 
 section Order
 
-def lt (x y : ZFRat) : Prop :=
-  Quotient.liftOn₂ x y (fun ⟨a, b⟩ ⟨c, d⟩ ↦ a * d < c * b)
-    fun ⟨x₁, x₂, hx₂⟩ ⟨y₁, y₂, hy₂⟩ ⟨u₁, u₂, hu₂⟩ ⟨v₁, v₂, hv₂⟩ hxu hyv ↦ by
-      have h1 : x₁ * u₂ = x₂ * u₁ := hxu
-      have h2 : y₁ * v₂ = y₂ * v₁ := hyv
-      dsimp
-      ext
-      obtain u₂_neg | u₂_pos : u₂ < 0 ∨ 0 < u₂ := by
-        rcases lt_trichotomy u₂ 0 with h | rfl | h
-        · left; exact h
-        · contradiction
-        · right; exact h
-      all_goals
-        obtain v₂_neg | v₂_pos : v₂ < 0 ∨ 0 < v₂ := by
-          rcases lt_trichotomy v₂ 0 with h | rfl | h
-          · left; exact h
-          · contradiction
-          · right; exact h
-      all_goals
-        obtain x₂_neg | x₂_pos : x₂ < 0 ∨ 0 < x₂ := by
-          rcases lt_trichotomy x₂ 0 with h | rfl | h
-          · left; exact h
-          · contradiction
-          · right; exact h
-      all_goals
-        obtain y₂_neg | y₂_pos : y₂ < 0 ∨ 0 < y₂ := by
-          rcases lt_trichotomy y₂ 0 with h | rfl | h
-          · left; exact h
-          · contradiction
-          · right; exact h
-      all_goals constructor <;> intro h
-      · have : (x₁ * u₂) * (y₂ * v₂) < (y₁ * v₂) * (x₂ * u₂) := by
-          ac_change (x₁ * y₂) * (u₂ * v₂) < (y₁ * x₂) * (u₂ * v₂)
-          exact ZFInt.mul_lt_mul_of_pos_right h (ZFInt.mul_neg_neg_pos u₂ v₂ u₂_neg v₂_neg)
-        rw [h1, h2] at this
-        convert_to u₁ * v₂ * (y₂ * x₂) <  v₁ * u₂ * (y₂ * x₂) at this
-        · ac_rfl
-        · ac_rfl
-        · have mul_pos : 0 < y₂ * x₂ := ZFInt.mul_neg_neg_pos y₂ x₂ y₂_neg x₂_neg
-          rwa [mul_lt_mul_iff_of_pos_right mul_pos] at this
-      all_goals admit
+/-- A rational is positive iff numerator and denominator carry the same sign.
+Well-defined because for equivalent reps `(a,b) ≈ (c,d)` (i.e. `a*d = b*c`),
+multiplying both sides by `b*d` gives `(a*b)*(d*d) = (b*b)*(c*d)`, and `b*b`,
+`d*d` are both positive, so `a*b` and `c*d` share a sign. -/
+def isPos (x : ZFRat) : Prop :=
+  Quotient.liftOn x (fun ⟨a, b, _⟩ ↦ 0 < a * b)
+    fun ⟨a, b, hb⟩ ⟨c, d, hd⟩ h ↦ by
+      unfold_projs at h
+      simp only [ZFSet.qrel] at h
+      dsimp only
+      have hb2 : 0 < b * b := by
+        rcases lt_trichotomy b 0 with hb' | hb' | hb'
+        · exact ZFInt.mul_neg_neg_pos b b hb' hb'
+        · exact absurd hb' hb
+        · exact ZFInt.mul_pos_pos_pos b b hb' hb'
+      have hd2 : 0 < d * d := by
+        rcases lt_trichotomy d 0 with hd' | hd' | hd'
+        · exact ZFInt.mul_neg_neg_pos d d hd' hd'
+        · exact absurd hd' hd
+        · exact ZFInt.mul_pos_pos_pos d d hd' hd'
+      have key : (a * b) * (d * d) = (b * b) * (c * d) := by
+        ac_change (a * d) * (b * d) = (b * c) * (b * d)
+        rw [h]
+      apply propext
+      constructor
+      · intro hab
+        have h1 : 0 < (a * b) * (d * d) := ZFInt.mul_pos_pos_pos _ _ hab hd2
+        rw [key] at h1
+        exact ZFInt.pos_of_mul_pos h1 hb2
+      · intro hcd
+        have h1 : 0 < (b * b) * (c * d) := ZFInt.mul_pos_pos_pos _ _ hb2 hcd
+        rw [←key, ZFInt.mul_comm (a * b) (d * d)] at h1
+        exact ZFInt.pos_of_mul_pos h1 hd2
+
+def lt (x y : ZFRat) : Prop := isPos (y - x)
 
 instance : LT ZFRat where lt := lt
 instance : LE ZFRat where le x y := x < y ∨ x = y
+
+theorem isPos_eq (n : ZFInt × ZFInt') : isPos (mk n) ↔ 0 < n.1 * n.2 := Iff.rfl
+
+theorem lt_eq (n m : ZFInt × ZFInt') :
+    mk n < mk m ↔ 0 < (m.1 * n.2 - n.1 * m.2) * (m.2 * n.2) := by
+  change isPos (mk m - mk n) ↔ _
+  rw [sub_eq, isPos_eq]
+
+theorem isPos_trichotomy (x : ZFRat) : isPos x ∨ x = 0 ∨ isPos (-x) := by
+  induction x using Quotient.ind
+  rename_i n
+  obtain ⟨a, b, hb⟩ := n
+  change isPos (mk (a, ⟨b, hb⟩)) ∨ mk (a, ⟨b, hb⟩) = 0 ∨ isPos (-mk (a, ⟨b, hb⟩))
+  rw [isPos_eq, mk_eq_zero_iff, neg_eq, isPos_eq]
+  rcases lt_trichotomy (a * b) 0 with h | h | h
+  · right; right
+    rw [←ZFInt.neg_mul_distrib]
+    exact (ZFInt.neg_flip_lt (a * b)).mp h
+  · right; left
+    rw [ZFInt.mul_comm] at h
+    exact ZFInt.mul_eq_zero_of_ne_zero h hb
+  · left; exact h
+
+theorem not_isPos_zero : ¬ isPos (0 : ZFRat) := by
+  rw [zero_eq, isPos_eq]
+  simp
+
+theorem isPos_one : isPos (1 : ZFRat) := by
+  rw [one_eq, isPos_eq]
+  simp [ZFInt.zero_lt_one]
+
+theorem isPos_add {x y : ZFRat} (hx : isPos x) (hy : isPos y) : isPos (x + y) := by
+  induction x using Quotient.ind
+  induction y using Quotient.ind
+  rename_i n m
+  have hx' := (isPos_eq n).mp hx
+  have hy' := (isPos_eq m).mp hy
+  apply (isPos_eq _).mpr
+  have hb2 : 0 < n.2.1 * n.2.1 := by
+    rcases lt_trichotomy n.2.1 0 with hb | hb | hb
+    · exact ZFInt.mul_neg_neg_pos _ _ hb hb
+    · exact absurd hb n.2.2
+    · exact ZFInt.mul_pos_pos_pos _ _ hb hb
+  have hd2 : 0 < m.2.1 * m.2.1 := by
+    rcases lt_trichotomy m.2.1 0 with hd | hd | hd
+    · exact ZFInt.mul_neg_neg_pos _ _ hd hd
+    · exact absurd hd m.2.2
+    · exact ZFInt.mul_pos_pos_pos _ _ hd hd
+  have key : (n.1 * m.2.1 + n.2.1 * m.1) * (n.2.1 * m.2.1) =
+      (n.1 * n.2.1) * (m.2.1 * m.2.1) + (n.2.1 * n.2.1) * (m.1 * m.2.1) := by ring
+  rw [key]
+  exact add_pos (ZFInt.mul_pos_pos_pos _ _ hx' hd2) (ZFInt.mul_pos_pos_pos _ _ hb2 hy')
+
+theorem isPos_mul {x y : ZFRat} (hx : isPos x) (hy : isPos y) : isPos (x * y) := by
+  induction x using Quotient.ind
+  induction y using Quotient.ind
+  rename_i n m
+  have hx' := (isPos_eq n).mp hx
+  have hy' := (isPos_eq m).mp hy
+  apply (isPos_eq _).mpr
+  have key : n.1 * m.1 * (n.2.1 * m.2.1) = (n.1 * n.2.1) * (m.1 * m.2.1) := by ring
+  rw [key]
+  exact ZFInt.mul_pos_pos_pos _ _ hx' hy'
+
+theorem lt_irrefl (x : ZFRat) : ¬ x < x := by
+  change ¬ isPos (x - x)
+  rw [sub_self]
+  exact not_isPos_zero
+
+theorem not_isPos_and_isPos_neg {z : ZFRat} (h : isPos z) : ¬ isPos (-z) := by
+  intro h'
+  apply not_isPos_zero
+  have := isPos_add h h'
+  rwa [add_neg_cancel] at this
+
+theorem lt_asymm {x y : ZFRat} (h : x < y) : ¬ y < x := by
+  change isPos (y - x) at h
+  change ¬ isPos (x - y)
+  rw [show x - y = -(y - x) by ring]
+  exact not_isPos_and_isPos_neg h
+
+theorem lt_trans {x y z : ZFRat} (hxy : x < y) (hyz : y < z) : x < z := by
+  change isPos (y - x) at hxy
+  change isPos (z - y) at hyz
+  change isPos (z - x)
+  rw [show z - x = (y - x) + (z - y) by ring]
+  exact isPos_add hxy hyz
+
+theorem lt_trichotomy (x y : ZFRat) : x < y ∨ x = y ∨ y < x := by
+  rcases isPos_trichotomy (y - x) with h | h | h
+  · left; exact h
+  · right; left; exact (sub_eq_zero.mp h).symm
+  · right; right
+    change isPos (x - y)
+    rwa [neg_sub] at h
+
+theorem le_refl (x : ZFRat) : x ≤ x := Or.inr rfl
+
+theorem le_trans {x y z : ZFRat} (hxy : x ≤ y) (hyz : y ≤ z) : x ≤ z := by
+  rcases hxy with hxy | rfl
+  · rcases hyz with hyz | rfl
+    · exact Or.inl (lt_trans hxy hyz)
+    · exact Or.inl hxy
+  · exact hyz
+
+theorem le_antisymm {x y : ZFRat} (hxy : x ≤ y) (hyx : y ≤ x) : x = y := by
+  rcases hxy with hxy | rfl
+  · rcases hyx with hyx | rfl
+    · exact absurd hyx (lt_asymm hxy)
+    · rfl
+  · rfl
+
+theorem le_total (x y : ZFRat) : x ≤ y ∨ y ≤ x := by
+  rcases lt_trichotomy x y with h | h | h
+  · exact Or.inl (Or.inl h)
+  · exact Or.inl (Or.inr h)
+  · exact Or.inr (Or.inl h)
+
+theorem lt_iff_le_not_ge (x y : ZFRat) : x < y ↔ x ≤ y ∧ ¬ y ≤ x := by
+  constructor
+  · intro h
+    refine ⟨Or.inl h, ?_⟩
+    rintro (h' | rfl)
+    · exact lt_asymm h h'
+    · exact lt_irrefl _ h
+  · rintro ⟨h | rfl, h2⟩
+    · exact h
+    · exact absurd (le_refl _) h2
+
+noncomputable instance : LinearOrder ZFRat where
+  le x y := x < y ∨ x = y
+  le_refl := le_refl
+  le_trans _ _ _ := le_trans
+  le_antisymm _ _ := le_antisymm
+  le_total := le_total
+  toDecidableLE := fun _ _ => Classical.propDecidable ((· ≤ ·) _ _)
+  lt_iff_le_not_ge := lt_iff_le_not_ge
+
+theorem add_le_add_left (a b : ZFRat) (h : a ≤ b) (c : ZFRat) : a + c ≤ b + c := by
+  rcases h with h | rfl
+  · refine Or.inl ?_
+    change isPos (b - a) at h
+    change isPos ((b + c) - (a + c))
+    rwa [show (b + c) - (a + c) = b - a by ring]
+  · exact Or.inr rfl
+
+theorem zero_lt_one : (0 : ZFRat) < 1 := by
+  change isPos (1 - 0)
+  rw [sub_zero]
+  exact isPos_one
+
+theorem zero_le_one : (0 : ZFRat) ≤ 1 := Or.inl zero_lt_one
+
+theorem mul_lt_mul_of_pos_left {a : ZFRat} (ha : 0 < a) {b c : ZFRat} (hbc : b < c) :
+    a * b < a * c := by
+  change isPos (a - 0) at ha
+  rw [sub_zero] at ha
+  change isPos (c - b) at hbc
+  change isPos (a * c - a * b)
+  rw [show a * c - a * b = a * (c - b) by ring]
+  exact isPos_mul ha hbc
+
+theorem mul_lt_mul_of_pos_right {a : ZFRat} (ha : 0 < a) {b c : ZFRat} (hbc : b < c) :
+    b * a < c * a := by
+  change isPos (a - 0) at ha
+  rw [sub_zero] at ha
+  change isPos (c - b) at hbc
+  change isPos (c * a - b * a)
+  rw [show c * a - b * a = (c - b) * a by ring]
+  exact isPos_mul hbc ha
+
+theorem mul_le_mul_of_nonneg_left {a : ZFRat} (ha : 0 ≤ a) {b c : ZFRat} (hbc : b ≤ c) :
+    a * b ≤ a * c := by
+  rcases ha with ha | rfl
+  · rcases hbc with hbc | rfl
+    · exact Or.inl (mul_lt_mul_of_pos_left ha hbc)
+    · exact Or.inr rfl
+  · simp
+
+theorem mul_le_mul_of_nonneg_right {a : ZFRat} (ha : 0 ≤ a) {b c : ZFRat} (hbc : b ≤ c) :
+    b * a ≤ c * a := by
+  rcases ha with ha | rfl
+  · rcases hbc with hbc | rfl
+    · exact Or.inl (mul_lt_mul_of_pos_right ha hbc)
+    · exact Or.inr rfl
+  · simp
+
+instance : IsOrderedRing ZFRat where
+  add_le_add_left := add_le_add_left
+  zero_le_one := zero_le_one
+  mul_le_mul_of_nonneg_left _ ha _ _ hbc := mul_le_mul_of_nonneg_left ha hbc
+  mul_le_mul_of_nonneg_right _ ha _ _ hbc := mul_le_mul_of_nonneg_right ha hbc
+
+instance : PosMulStrictMono ZFRat where
+  mul_lt_mul_of_pos_left _ ha _ _ hbc := mul_lt_mul_of_pos_left ha hbc
+
+instance : MulPosStrictMono ZFRat where
+  mul_lt_mul_of_pos_right _ ha _ _ hbc := mul_lt_mul_of_pos_right ha hbc
 
 end Order
 
