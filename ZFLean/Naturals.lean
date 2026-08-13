@@ -296,6 +296,12 @@ theorem succ_wf : @WellFounded ZFNat (succ · = ·) := by
   · exact succ_subrelation_mem
   · exact mem_wf'
 
+theorem lt_wf : @WellFounded ZFNat (· < ·) := mem_wf'
+
+instance : WellFoundedRelation ZFNat where
+  rel := (· < ·)
+  wf := lt_wf
+
 /--
 The induction principle for sets in `Nat`. This principle is meant to be used for definitional
 purposes only.
@@ -717,6 +723,8 @@ instance : LinearOrder ZFNat where
   toDecidableLE := fun _ _ => Classical.propDecidable ((· ≤ ·) _ _)
   lt_iff_le_not_ge _ _ := lt_iff_le_not_ge
 
+instance : PartialOrder ZFNat := ZFNat.instLinearOrder.toPartialOrder
+
 instance : IsStrictTotalOrder ZFNat (·<·) where
   trichotomous x y := by
     intros h₁ h₂
@@ -726,6 +734,13 @@ instance : IsStrictTotalOrder ZFNat (·<·) where
     | rfl
   irrefl _ := lt_irrefl
   trans _ _ _ := lt_trans
+
+instance : IsBotZeroClass ZFNat where
+  isBot_zero := by
+    unfold IsBot
+    intro _
+    rw [←not_lt]
+    exact not_lt_zero
 
 end Inequalities
 
@@ -1120,6 +1135,16 @@ theorem le_zero_imp_eq {n : ZFNat} : n ≤ 0 → n = 0 := by
   · exact absurd h not_lt_zero
   · rfl
 
+theorem le_iff_sub_eq_zero {n m : ZFNat} : n ≤ m ↔ n - m = 0 := by
+  constructor
+  · intro h
+    obtain ⟨d, hd⟩ := le.dest h
+    rw [←hd, sub_add_distrib,sub_self,zero_sub]
+  · intro h
+    by_contra
+    rw [not_le] at this
+    nomatch ZFNat.sub_ne_zero_of_lt this h
+
 /-- The multiplication function on natural numbers, defined inductively. -/
 protected abbrev mul (n m : ZFNat) : ZFNat := ZFNat.rec n 0 (fun _ => (· + m))
 instance mul_inst : Mul ZFNat := ⟨ZFNat.mul⟩
@@ -1294,6 +1319,10 @@ lemma sub_eq_zero_imp_le {a b : ZFNat} : a - b = 0 ↔ a ≤ b := by
   · intro
     exact sub_lt_eq_zero ‹_›
 
+lemma lt_iff_sub_pos {a b : ZFNat} : a < b ↔ 0 < b - a := by
+  rw [←not_iff_not,not_lt,not_lt,le_zero_iff,iff_comm]
+  exact sub_eq_zero_imp_le
+
 lemma sub_eq_zero_mul {n a b : ZFNat} : a - b = 0 → n * a - n * b = 0 := by
   intro
   induction n with
@@ -1449,15 +1478,169 @@ instance : Semiring ZFNat where
 instance : CommSemiring ZFNat where
   mul_comm := mul_comm
 
+instance : IsOrderedRing ZFNat where
+  add_le_add_left := fun _ _ h c => add_le_add_right h c
+  mul_le_mul_of_nonneg_left := fun _ _ _ _ h ↦ ZFNat.mul_le_mono h
+  mul_le_mul_of_nonneg_right := by
+    intro _ _ _ _ h
+    conv => congr <;> rw [mul_comm]
+    exact mul_le_mono h
+
+instance : IsStrictOrderedRing ZFNat where
+  le_of_add_le_add_left := (Iff.mp <| @add_le_add_iff_left · · ·)
+  exists_pair_ne := ⟨0, 1, Ne.symm (succ_ne_zero 0)⟩
+  mul_lt_mul_of_pos_left := fun _ p _ _ h ↦ mul_lt_mono p h
+  mul_lt_mul_of_pos_right := by
+    intro _ p _ _ h
+    conv => congr <;> rw [mul_comm]
+    exact mul_lt_mono p h
+
 instance : Std.Associative (α := ZFNat) (· + ·) := ⟨(ZFNat.add_assoc · · · |>.symm)⟩
 instance : Std.Commutative (α := ZFNat) (· + ·) := ⟨ZFNat.add_comm⟩
 
 instance : Std.Associative (α := ZFNat) (· * ·) := ⟨ZFNat.mul_assoc⟩
 instance : Std.Commutative (α := ZFNat) (· * ·) := ⟨ZFNat.mul_comm⟩
 
-
 instance : IsLeftCancelAdd ZFNat where
   add_left_cancel x y z := by rw [ZFNat.add_left_cancel]; intro; trivial
+instance : AddCancelCommMonoid ZFNat where
+
+lemma sub_right_inj {a b c : ZFNat} (ha : b ≤ a ∧ c ≤ a) : a - b = a - c ↔ b = c := by
+  let ⟨db, hb⟩ := le.dest ha.left
+  let ⟨dc, hc⟩ := le.dest ha.right
+  conv_lhs =>
+    congr
+    · rw [←hb, add_comm,ZFNat.add_sub_cancel]
+    · rw [←hc, add_comm,ZFNat.add_sub_cancel]
+  apply eq_iff_eq_of_add_eq_add
+  trans a
+  · rwa [add_comm]
+  · rwa [eq_comm,add_comm]
+
+lemma div_lemma {n m : ZFNat} (nz : 0 < n ∧ 0 < m) : m - n < m := by
+  if mltn : m ≤ n then rw [ZFNat.sub_lt_eq_zero mltn]; exact nz.right
+  else
+    push Not at mltn
+    apply ZFNat.lt_of_succ_le
+    rw [←ZFNat.add_one_eq_succ, ZFNat.sub_add_comm <| ZFNat.le_of_lt mltn, ZFNat.add_comm]
+    rw [←@ZFNat.add_le_add_iff_left n, ZFNat.add_comm]
+    rw [ ZFNat.sub_add_cancel
+      <| ZFNat.add_comm 1 m ▸ ZFNat.add_one_eq_succ ▸ ZFNat.le_succ_of_le
+      <| ZFNat.le_of_lt mltn]
+    rw [ZFNat.add_comm]
+    conv => right; rw [ZFNat.add_comm]
+    rw [ZFNat.add_le_add_iff_left, ←@ZFNat.add_zero 1, ZFNat.add_comm, ZFNat.add_one_eq_succ]
+    exact ZFNat.succ_le_of_lt nz.left
+
+def div.{u} (m n : ZFNat.{u}) : ZFNat.{u} :=
+  if nz : m - n < m ∧ n ≤ m then
+    1 + div (m - n) n
+  else 0
+  termination_by m
+  decreasing_by exact nz.left
+noncomputable instance div_inst : Div ZFNat where
+  div := div
+lemma div_eq {a b : ZFNat} : a / b = a.div b := rfl
+
+lemma zero_div {n : ZFNat} : 0 / n = 0 := by
+  rw [div_eq, div, dif_neg]
+  rw [zero_sub]
+  exact not_and_of_not_left _ lt_irrefl
+lemma div_zero {n : ZFNat} : n / 0 = 0 := by
+  rw [div_eq, div, dif_neg]
+  rw [sub_zero]
+  refine not_and_of_not_left _ lt_irrefl
+
+def mod (m n : ZFNat) : ZFNat := m - n * (m / n)
+-- kernel panics at https://github.com/leanprover/lean4/blob/master/src/Lean/Compiler/LCNF/ExplicitBoxing.lean#L301
+noncomputable instance mod_inst : Mod ZFNat where
+  mod := mod
+lemma mod_eq {a b : ZFNat} : a % b = a.mod b := rfl
+
+lemma zero_mod {n : ZFNat} : 0  % n = 0 := by
+  rw [mod_eq, mod, zero_sub]
+lemma mod_zero {n : ZFNat} : n % 0 = n := by
+  rw [mod_eq, mod, div_zero, zero_mul, sub_zero]
+
+lemma div_mul_le {a b : ZFNat} : a / b * b ≤ a := by
+  rw [div_eq, div]
+  split_ifs with hba
+  · have h := @div_mul_le (a - b) b
+    rw [←@ZFNat.add_le_add_iff_left b,←ZFNat.add_sub_assoc hba.right,
+      ←ZFNat.sub_add_comm <| le_refl b,sub_self,zero_add] at h
+    rwa [right_distrib, one_mul]
+  · rw [zero_mul]
+    exact zero_le
+  termination_by a
+  decreasing_by exact hba.left
+
+lemma lt_div_mul {a b : ZFNat} (hb : 0 < b) : a < b + a / b * b := by
+  if ha : a = 0 then
+    rw [ha,zero_div,zero_mul,add_zero]
+    exact hb
+  else
+  rw [div_eq, div]
+  split_ifs with hba
+  · have h := @lt_div_mul (a - b) b hb
+    rw [←@ZFNat.add_lt_add_iff_left b,←ZFNat.add_sub_assoc hba.right,
+      ←ZFNat.sub_add_comm <| le_refl b,sub_self,zero_add] at h
+    rwa [right_distrib, one_mul]
+  · rw [zero_mul,add_zero]
+    rw [not_and,not_le] at hba
+    rw [←ne_eq, ne_comm] at ha
+    exact hba <| div_lemma ⟨hb, pos_of_ne_zero ha⟩
+  termination_by a
+  decreasing_by exact hba.left
+
+theorem mul_div_add_mod_eq {a b : ZFNat} : b * (a / b) + (a % b) = a := by
+  rw [mod_eq,mod,←add_sub_assoc,add_comm,add_sub_assoc,sub_self,add_zero]
+  · rfl
+  · rw [mul_comm]
+    exact div_mul_le
+
+theorem mul_right_div_cancel {a b : ZFNat} (hb : 0 < b) : a * b / b  = a := by
+  induction a with
+  | zero => rw [zero_mul,zero_div]
+  | succ a ha =>
+    rw [right_distrib, one_mul,div_eq, div, add_sub_cancel,
+      dif_pos ⟨lt_add_of_pos_right hb, le_add_left b (a * b)⟩, ←div_eq, ha,
+      add_comm]
+lemma mul_left_div_cancel {a b : ZFNat} (hb : 0 < b) : b * a / b  = a :=
+  mul_comm b a ▸ mul_right_div_cancel hb
+
+lemma succ_div_eq_div_iff_succ_mod_eq_mod_suc {a b : ZFNat} :
+    a.succ / b  = a / b ↔ a.succ % b = (a % b).succ := by
+  rcases (eq_zero_or_pos b) with bz | bp
+  · rw [bz,div_zero,div_zero,mod_zero,mod_zero]
+    exact Iff.trans (iff_true_intro rfl) (iff_true_intro rfl).symm
+  · rw [mod_eq,mod,mod_eq,mod]
+    conv_lhs =>
+      rw [←ZFNat.mul_left_cancel_iff <| zero_lt_ne_zero bp]
+      conv => congr <;> rw [mul_comm]
+      rw [←sub_right_inj ⟨div_mul_le, le_trans div_mul_le le_succ⟩]
+      conv =>
+        right
+        rw [←add_one_eq_succ,add_comm,add_sub_assoc div_mul_le,add_comm, add_one_eq_succ]
+      conv => congr <;> rw [mul_comm]
+
+lemma div_mul_eq_iff_mod_eq_zero {a b : ZFNat} :
+    a / b * b = a ↔ a % b = 0 := by
+  have w := @mul_div_add_mod_eq a b
+  conv at w =>
+    congr
+    · rw [mul_comm]
+    · rw [←@add_zero a]
+  exact eq_iff_eq_of_add_eq_add w
+
+lemma div_lt {a b : ZFNat} (ha : a < b) : a / b = 0 := by
+  rw [div_eq,div,dite_eq_ite,if_neg <| not_and.mpr (fun _ => not_le.mpr ha)]
+
+theorem mod_lt {a b : ZFNat} (hb : 0 < b) : a % b < b := by
+  rw [mod_eq, mod,←@add_lt_add_iff_right (b * (a / b)),mul_comm,sub_add_cancel div_mul_le]
+  exact lt_div_mul hb
+
+
+
 
 def toNat (n : ZFNat) : ℕ := ZFNat.rec n 0 (fun _ => Nat.succ)
 def ofNat (n : ℕ) : ZFNat := nsmul n 1
@@ -1569,7 +1752,6 @@ def ZFNat.equivZFNat_Nat : ZFNat ≃ ℕ where
       rw [ofNat, toNat, ZFNat.rec_zero]
     | succ n ih =>
       rw [ofNat, nsmul, add_one_eq_succ', ←ofNat, toNat, ZFNat.rec_succ, ←toNat, ih]
-
 
 end Naturals
 end ZFSet

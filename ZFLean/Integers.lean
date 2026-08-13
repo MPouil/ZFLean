@@ -6,6 +6,9 @@ Authors: Vincent Trélat
 import ZFLean.Naturals
 import Mathlib.Algebra.Order.Ring.Defs
 import Mathlib.Algebra.Order.Group.Defs
+import Mathlib.Algebra.EuclideanDomain.Defs
+import Mathlib.Algebra.Order.AbsoluteValue.Basic
+import Mathlib.Tactic.Monotonicity
 
 /-! # ZFC Integers
 
@@ -463,6 +466,16 @@ theorem lt_zero_iff {n m : ZFNat} : m < n ↔ 0 < ZFInt.mk (n,m) := by
     rw [ZFInt.zero_eq] at h
     change 0 + m < 0 + n at h
     exact ZFNat.add_lt_add_iff_left.mp h
+
+theorem le_zero_iff {n m : ZFNat} : m ≤ n ↔ 0 ≤ ZFInt.mk (n,m) := by
+  conv =>
+    congr
+    · rw [le_iff_lt_or_eq]
+    · rw [LE.le, int_le]
+      dsimp only
+      rw [←lt_zero_iff,zero_eq,eq,ZFSet.zrel]
+      dsimp only
+      rw [ZFNat.zero_add, ZFNat.zero_add]
 
 theorem neg_one_lt_zero : (-1 : ZFInt) < 0 := add_left_neg ▸ lt_succ (n := (-1))
 theorem zero_lt_one : (0 : ZFInt) < 1 := ZFInt.zero_add (x:=1) ▸ lt_succ
@@ -944,6 +957,11 @@ theorem mul_eq_zero_iff {a b : ZFInt} : a * b = 0 ↔ a = 0 ∨ b = 0 := by
     · rw [h, zero_mul]
     · rw [h, mul_zero]
 
+theorem mul_nonneg_iff {a b : ZFInt} : 0 ≤  a * b ↔ (0 ≤  a ∧ 0 ≤ b) ∨ (a ≤ 0 ∧ b ≤ 0) := by
+  simp_rw [le_iff_eq_or_lt]
+  conv_lhs => rw [eq_comm,mul_eq_zero_iff, mul_pos_iff]
+  grind
+
 theorem mul_eq_zero_of_ne_zero {a b : ZFInt} : a * b = 0 → a ≠ 0 → b = 0 := by
   intro h h'
   rw [mul_eq_zero_iff] at h
@@ -998,6 +1016,390 @@ instance : PosMulStrictMono ZFInt where
 instance : MulPosStrictMono ZFInt where
   mul_lt_mul_of_pos_right _ h _ _ h' := mul_lt_mul_of_pos_right h' h
 
+noncomputable def toZFNatP (x : ZFInt) : ZFNat := Quotient.liftOn x (fun x => x.1 - x.2) (by
+  intro a b
+  rw [HasEquiv.Equiv, instHasEquivOfSetoid,ZFSet.instSetoidZFNatZFNat]
+  dsimp only
+  rw [ZFSet.zrel]
+  exact add_eq_add_sub_eq_sub
+)
+
+theorem mk_toZFNatP_eq {b : ZFInt} (h : 0 ≤ b) : mk (b.toZFNatP, 0) = b := by
+  induction b using Quotient.ind
+  rename_i b
+  rw [mk_eq,←le_zero_iff] at h
+  rw [toZFNatP, Quotient.liftOn_mk, mk_eq, eq, ZFSet.zrel]
+  dsimp only
+  rw [ZFNat.sub_add_cancel h, ZFNat.zero_add]
+
+theorem toZFNatP_of_zero : toZFNatP 0 = 0 := by
+  conv =>
+    congr
+    · rw [←@ZFNat.add_zero (toZFNatP 0)]
+    · rw [←@ZFNat.add_zero 0]
+  change ZFSet.zrel (toZFNatP 0, 0) (0, 0)
+  rw [←eq,←zero_eq,mk_toZFNatP_eq <| le_refl 0]
+
+noncomputable def toZFNatN (b : ZFInt) : ZFNat := (-b).toZFNatP
+
+theorem mk_toZFNatN_eq {b : ZFInt} (h : b ≤ 0) : mk (0, b.toZFNatN) = b := by
+  calc
+    mk (0, b.toZFNatN) = mk (0 , (-b).toZFNatP) := rfl
+    _  = - mk ((-b).toZFNatP, 0) := neg_eq (_,_)
+    _  = - -b := congrArg (- ·) <| mk_toZFNatP_eq <| (neg_flip_le b).mp h
+    _  = b := neg_neg b
+
+theorem toZFNatN_of_zero : toZFNatN 0 = 0 := by
+  rw [toZFNatN,neg_zero]
+  exact toZFNatP_of_zero
+
+noncomputable abbrev absZFNat.quot (a : ZFNat × ZFNat) : ZFNat := (a.1 - a.2) + (a.2 - a.1)
+
+lemma absZFNat.wf (a b : ZFNat × ZFNat) (arb : ZFSet.zrel a b) :
+    absZFNat.quot a = absZFNat.quot b := by
+  unfold absZFNat.quot
+  unfold ZFSet.zrel at arb
+  wlog ao : a.2 ≤ a.1
+  · specialize this ⟨a.2, a.1⟩ ⟨b.2, b.1⟩ arb.symm  (le_of_lt <| not_le.mp ao)
+    dsimp only at this
+    conv_lhs => rw [ZFNat.add_comm]
+    conv_rhs => rw [ZFNat.add_comm]
+    exact this
+  have bo : b.2 ≤ b.1 := by
+    obtain ⟨d, hd⟩ := ZFNat.le.dest ao
+    rw [←hd,←ZFNat.add_assoc,add_left_cancel_iff,ZFNat.add_comm] at arb
+    apply ZFNat.le.intro arb
+  rw [ZFNat.add_eq_add_sub_eq_sub arb, ZFNat.add_left_cancel, ZFNat.sub_lt_eq_zero ao,
+    ZFNat.sub_lt_eq_zero bo]
+
+noncomputable def absZFNat (x : ZFInt) : ZFNat :=
+  Quotient.liftOn x absZFNat.quot absZFNat.wf
+
+theorem absZFNat_eq_toZFNatP_iff_nneg {x : ZFInt} : 0 ≤ x ↔ x.absZFNat = x.toZFNatP := by
+  cases x using Quotient.ind
+  rw [absZFNat, Quotient.liftOn_mk,toZFNatP, Quotient.liftOn_mk,mk_eq, ←le_zero_iff, absZFNat.quot,
+    ZFNat.add_right_eq_self,ZFNat.le_iff_sub_eq_zero]
+
+
+theorem absZFNat_eq_toZFNatN_iff_npos {x : ZFInt} : x ≤ 0 ↔ x.absZFNat = x.toZFNatN := by
+  cases x using Quotient.ind
+  rw [absZFNat, Quotient.liftOn_mk,toZFNatN, toZFNatP,mk_eq,neg_eq,←mk_eq,←mk_eq,Quotient.liftOn_mk,
+    mk_eq,neg_flip_le,neg_eq,←le_zero_iff, absZFNat.quot, ZFNat.add_left_eq_self,
+    ZFNat.le_iff_sub_eq_zero]
+
+theorem absZFNat_eq_zero_iff {x : ZFInt} : x.absZFNat = 0 ↔ x = 0 := by
+  cases x using Quotient.ind
+  rw [absZFNat, Quotient.liftOn_mk, absZFNat.quot,ZFNat.add_eq_zero_iff,
+    ←ZFNat.le_iff_sub_eq_zero,←ZFNat.le_iff_sub_eq_zero]
+  conv =>
+    congr
+    · conv => right ; rw [←not_lt]
+      rw [←eq_iff_le_not_lt]
+    · rw [mk_eq, zero_eq, eq, ZFSet.zrel, ZFNat.add_zero, ZFNat.add_zero]
+
+theorem absZFNat_iif_ite_toZFNatS {x : ZFInt} :
+    x.absZFNat = if 0 ≤ x then x.toZFNatP else x.toZFNatN := by
+  split_ifs with h
+  · exact absZFNat_eq_toZFNatP_iff_nneg.mp h
+  · exact absZFNat_eq_toZFNatN_iff_npos.mp <| le_of_lt <| not_le.mp h
+
+theorem absZFNat_neg_eq_absZFNat {n : ZFInt} : ((-n).absZFNat) = n.absZFNat := by
+  cases n using Quotient.ind
+  simp_rw [mk_eq,neg_eq,←mk_eq,absZFNat,Quotient.liftOn_mk,absZFNat.quot]
+  rw [ZFNat.add_comm]
+
+theorem absZFNat_mul_eq_mul_absZFNat {n m : ZFInt} :
+    (n * m).absZFNat = n.absZFNat * m.absZFNat := by
+  wlog sn : 0 ≤ n
+  · rw [not_le,neg_flip_lt] at sn
+    apply le_of_lt at sn
+    conv =>
+      congr
+      · rw [←absZFNat_neg_eq_absZFNat,←neg_mul]
+      · left; rw [←absZFNat_neg_eq_absZFNat]
+    exact this sn
+  wlog sm : 0 ≤ m
+  · rw [not_le,neg_flip_lt] at sm
+    apply le_of_lt at sm
+    conv =>
+      congr
+      · rw [←absZFNat_neg_eq_absZFNat,mul_comm,←neg_mul,mul_comm]
+      · right; rw [←absZFNat_neg_eq_absZFNat]
+    exact this sn sm
+  cases n using Quotient.ind
+  cases m using Quotient.ind
+  rename_i n m
+  simp_rw [absZFNat_iif_ite_toZFNatS,if_pos sn, if_pos sm, ZFInt.mul_nonneg_iff]
+  rw [if_pos <| Or.inl ⟨sn, sm⟩]
+  simp_rw [toZFNatP, mk_eq,mul_eq,←mk_eq, Quotient.liftOn_mk]
+  rw [mk_eq,←le_zero_iff] at sn sm
+  have ⟨dn, hn⟩ := ZFNat.le.dest sn
+  conv =>
+    congr
+    · conv => congr <;> rw [ZFNat.add_comm]
+      rw [ZFNat.sub_add_distrib,
+        ZFNat.add_sub_assoc (mul_le_mul sn (le_refl m.1) ZFNat.zero_le ZFNat.zero_le),
+        ←ZFNat.right_distrib_mul_sub, ZFNat.add_comm]
+      conv => enter [1,1,1]; rw [←hn,ZFNat.add_comm,ZFNat.add_sub_cancel]
+      conv => right; rw [←hn,Distrib.right_distrib]
+      rw [ZFNat.sub_add_distrib,ZFNat.add_sub_cancel,←ZFNat.left_distrib_mul_sub]
+    · rw [←hn,ZFNat.add_comm,ZFNat.add_sub_cancel]
+
+theorem absZFNat_of_abs {x : ZFInt} : |x|.absZFNat = x.absZFNat := by
+  rw [abs]
+  rcases max_choice x (-x) with h | h
+  · rw [h]
+  · rw [h]
+    exact absZFNat_neg_eq_absZFNat
+
+theorem absZFNat.mono : MonotoneOn absZFNat { x | 0 ≤ x } := by
+  intro x nnx y nny xley
+  cases x using Quotient.ind
+  cases y using Quotient.ind
+  rename_i x y
+  simp_rw [absZFNat,Quotient.liftOn_mk,absZFNat.quot]
+  rw [Set.mem_setOf,mk_eq,←le_zero_iff] at nnx nny
+  rwa [ZFNat.le_iff_sub_eq_zero.mp nnx, ZFNat.le_iff_sub_eq_zero.mp nny, ZFNat.add_zero,
+    ZFNat.add_zero,←add_le_add_iff_right y.2,ZFNat.sub_add_cancel nny,ZFNat.sub_add_comm nnx,
+    ZFNat.add_comm, ←add_le_add_iff_right x.2,ZFNat.sub_add_cancel <| ZFNat.le_trans nnx
+    <| (ZFNat.le_add_left x.1 y.2), le_zero_iff, ←sub_eq,←mk_eq,←mk_eq, sub_eq_add_neg,
+    ←add_le_add_iff_right ⟦x⟧, zero_add,←add_assoc, neg_add_cancel,add_zero]
+
+theorem absZFNat.injOnNonNeg : Set.InjOn absZFNat { x | 0 ≤ x } := by
+  intro x nnx y nny  xey
+  cases x using Quotient.ind
+  cases y using Quotient.ind
+  rename_i x y
+  rw [Set.mem_setOf,mk_eq,←le_zero_iff] at nnx nny
+  rw[mk_eq,mk_eq,eq,ZFSet.zrel]
+  simp_rw [absZFNat,Quotient.liftOn_mk,absZFNat.quot, ZFNat.le_iff_sub_eq_zero.mp nnx,
+    ZFNat.le_iff_sub_eq_zero.mp nny, ZFNat.add_zero] at xey
+  rw [←@ZFNat.add_right_cancel _ x.2, ZFNat.sub_add_cancel nnx, ZFNat.sub_add_comm nny,
+    ZFNat.add_comm, ←@ZFNat.add_right_cancel _ y.2, ZFNat.add_sub_assoc nny,←ZFNat.add_assoc,
+    ZFNat.sub_add_cancel nny] at xey
+  exact xey
+
+theorem absZFNat.strictMono : StrictMonoOn absZFNat {x | 0 ≤ x} :=
+  absZFNat.mono.strictMonoOn_of_injOn absZFNat.injOnNonNeg
+
+theorem absZFNat.anti : AntitoneOn absZFNat { x | x ≤ 0 } := by
+  intro x nnx y nny xley
+  apply neg_le_neg at xley
+  rw [Set.mem_setOf,neg_flip_le,←@Set.mem_setOf _ _ (0 ≤ ·)] at nnx nny
+  conv => congr <;> rw [←absZFNat_neg_eq_absZFNat]
+  exact absZFNat.mono nny nnx xley
+
+theorem absZFNat.injOnNonPos : Set.InjOn absZFNat { x | x ≤ 0 } := by
+  intro x nnx y nny xey
+  rw [Set.mem_setOf,neg_flip_le,←@Set.mem_setOf _ _ (0 ≤ ·)] at nnx nny
+  conv at xey => congr <;> rw [←absZFNat_neg_eq_absZFNat]
+  rw [←neg_inj]
+  exact absZFNat.injOnNonNeg nnx nny xey
+
+noncomputable def div (a b : ZFInt) : ZFInt :=
+  if 0 ≤ a then
+    if 0 ≤ b then mk (a.toZFNatP / b.toZFNatP, 0)
+    else mk (0, a.toZFNatP / b.toZFNatN)
+  else
+    if 0 = b then mk (0, 0)
+    else if 0 ≤ b then mk (0, a.toZFNatN.pred / b.toZFNatP + 1)
+    else mk (a.toZFNatN.pred / b.toZFNatN + 1, 0)
+noncomputable instance div_inst : Div ZFInt := ⟨div⟩
+lemma div_eq {a b : ZFInt} : a / b = a.div b := by rfl
+
+noncomputable def mod (a b : ZFInt) : ZFInt :=
+  if 0 ≤ a then
+    if 0 ≤ b then mk (a.toZFNatP % b.toZFNatP, 0)
+    else mk (a.toZFNatP % b.toZFNatN, 0)
+  else
+    if 0 ≤ b then mk (b.toZFNatP, a.toZFNatN.pred % b.toZFNatP + 1)
+    else mk (b.toZFNatN, a.toZFNatN.pred % b.toZFNatN + 1)
+
+
+noncomputable instance mod_inst : Mod ZFInt := ⟨mod⟩
+lemma mod_eq {a b : ZFInt} : a % b = a.mod b := by rfl
+
+theorem mod_neg {a b : ZFInt} : a % b = a % -b := by
+  simp_rw [mod_eq, mod]
+  by_cases h: 0 < b
+  · simp_rw [if_pos <| le_of_lt h, if_neg <| (propext <| neg_flip_le <| b) ▸ (not_le.mpr h),
+      toZFNatN, neg_neg]
+  · rw [not_lt] at h
+    cases h with
+    | inl h =>
+      simp_rw [if_neg <| not_le.mpr h, if_pos <| (propext <| neg_flip_le <| b) ▸ (le_of_lt h),
+      toZFNatN]
+    | inr h =>
+      rw [h,neg_zero]
+
+def mul_div_add_mod_eq {a b : ZFInt} : b * (a / b) + (a % b) = a := by
+  rw [mod_eq,mod,div_eq,div]
+  split_ifs with sa sb bz sb sb
+  · conv_lhs => enter [1,1] ; rw [←b.mk_toZFNatP_eq sb]
+    conv_rhs => rw [←a.mk_toZFNatP_eq sa]
+    rw [mul_eq,add_eq]
+    dsimp only
+    rw [ZFNat.zero_mul,ZFNat.mul_zero,ZFNat.zero_mul,ZFNat.zero_add,ZFNat.zero_add,ZFNat.add_zero]
+    rw [ZFNat.mul_div_add_mod_eq]
+  · conv_lhs => enter [1,1] ; rw [←b.mk_toZFNatN_eq <| le_of_lt <| not_le.mp sb]
+    conv_rhs => rw [←a.mk_toZFNatP_eq sa]
+    rw [mul_eq,add_eq]
+    dsimp only
+    rw [ZFNat.zero_mul,ZFNat.mul_zero,ZFNat.zero_mul,ZFNat.zero_add,ZFNat.zero_add,ZFNat.add_zero]
+    rw [ZFNat.mul_div_add_mod_eq]
+  · rw [not_le] at sa
+    conv_rhs => rw [←a.mk_toZFNatN_eq <| le_of_lt sa]
+    rw [←a.mk_toZFNatN_eq <| le_of_lt sa, neg_flip_lt,neg_eq,←lt_zero_iff] at sa
+    rw [←bz, toZFNatP_of_zero, zero_mul, zero_add, ZFNat.mod_zero, ZFNat.add_one_eq_succ]
+    dsimp only at sa
+    rw [ZFNat.succ_pred <| Ne.symm <|ne_of_lt sa]
+  · rw [not_le] at sa
+    conv_rhs => rw [←a.mk_toZFNatN_eq <| le_of_lt sa]
+    rw [←a.mk_toZFNatN_eq <| le_of_lt sa, neg_flip_lt,neg_eq,←lt_zero_iff] at sa
+    rw [←bz, toZFNatN_of_zero, zero_mul, zero_add, ZFNat.mod_zero, ZFNat.add_one_eq_succ]
+    dsimp only at sa
+    rw [ZFNat.succ_pred <| Ne.symm <|ne_of_lt sa]
+  · rw [not_le] at sa
+    conv_lhs => enter [1,1] ; rw [←b.mk_toZFNatP_eq sb]
+    conv_rhs => rw [←a.mk_toZFNatN_eq <| le_of_lt sa]
+    rw [←a.mk_toZFNatN_eq <| le_of_lt sa, neg_flip_lt,neg_eq,←lt_zero_iff] at sa
+    dsimp only at sa
+    rw [mul_eq,add_eq]
+    dsimp only
+    rw [ZFNat.zero_mul,ZFNat.mul_zero,ZFNat.zero_mul,ZFNat.zero_add,ZFNat.zero_add,ZFNat.add_zero]
+    conv_lhs =>
+      enter [1,2]
+      conv => left; rw [ZFNat.add_comm, ZFNat.left_distrib,ZFNat.mul_one]
+      rw [add_rotate,ZFNat.add_assoc, ZFNat.mul_div_add_mod_eq, ZFNat.add_one_eq_succ]
+      rw [ZFNat.succ_pred <| Ne.symm <| ne_of_lt sa]
+    conv_rhs =>
+      rw [←@add_zero <| mk _, ←@mk_eq_zero_iff.mpr <| @Eq.refl _ b.toZFNatP, add_eq]
+      dsimp only
+      rw [ZFNat.zero_add]
+  · rw [not_le] at sa sb
+    conv_lhs => enter [1,1] ; rw [←b.mk_toZFNatN_eq <| le_of_lt sb]
+    conv_rhs => rw [←a.mk_toZFNatN_eq <| le_of_lt sa]
+    rw [←a.mk_toZFNatN_eq <| le_of_lt sa, neg_flip_lt,neg_eq,←lt_zero_iff] at sa
+    dsimp only at sa
+    rw [mul_eq,add_eq]
+    dsimp only
+    rw [ZFNat.zero_mul,ZFNat.mul_zero,ZFNat.zero_mul,ZFNat.zero_add,ZFNat.zero_add,ZFNat.zero_add]
+    conv_lhs =>
+      enter [1,2]
+      conv => left; rw [ZFNat.add_comm, ZFNat.left_distrib,ZFNat.mul_one]
+      rw [add_rotate,ZFNat.add_assoc, ZFNat.mul_div_add_mod_eq, ZFNat.add_one_eq_succ]
+      rw [ZFNat.succ_pred <| Ne.symm <| ne_of_lt sa]
+    conv_rhs =>
+      rw [←@add_zero <| mk _, ←@mk_eq_zero_iff.mpr <| @Eq.refl _ b.toZFNatN, add_eq]
+      dsimp only
+      rw [ZFNat.zero_add]
+
+def nonneg_mod {a b : ZFInt} (nzb : b ≠ 0) : 0 ≤ a % b := by
+  wlog hb : 0 ≤ b
+  · rw [not_le,neg_flip_lt] at hb
+    apply le_of_lt at hb
+    rw [mod_neg]
+    rw [ne_eq,←neg_zero,eq_comm,neg_eq_comm,←ne_eq] at nzb
+    exact this nzb hb
+  rw [mod_eq, mod, if_pos hb, if_pos hb]
+  split_ifs with sa <;> rw [←le_zero_iff]
+  · exact ZFNat.zero_le
+  · rw [ZFNat.add_one_eq_succ, ZFNat.le_lt_iff,←absZFNat_eq_toZFNatP_iff_nneg.mp hb]
+    refine ZFNat.mod_lt <| ZFNat.pos_of_ne_zero ?_
+    rw [ne_comm,ne_eq, absZFNat_eq_zero_iff.not,←ne_eq]
+    exact nzb
+
+
+theorem bounded_mod {a b : ZFInt} (nzb : b ≠ 0) : a % b < |b| := by
+  wlog sb : 0 ≤ b
+  · rw [not_le,neg_flip_lt] at sb
+    apply le_of_lt at sb
+    rw [mod_neg,←abs_neg]
+    rw [ne_eq,←neg_zero,eq_comm,neg_eq_comm,←ne_eq] at nzb
+    exact this nzb sb
+  cases a using Quotient.ind
+  cases b using Quotient.ind
+  rename_i a b
+  rw [abs_of_nonneg sb]
+  rw [mod_eq, mod, if_pos sb, if_pos sb]
+  split_ifs with sa <;> rw [LT.lt,int_lt,←mk_eq] <;> dsimp only <;> rw [Quotient.liftOn₂_mk]
+  <;> dsimp only <;> (try rw [toZFNatN,mk_eq a,neg_eq,←mk_eq])
+  <;> simp_rw [toZFNatP,Quotient.lift_mk] <;>
+  rw [mk_eq,←le_zero_iff] at sa sb <;>
+  have ⟨db, hb⟩ := ZFNat.le.dest sb <;>
+  rw [ZFNat.add_comm] at hb <;>
+  rw [←hb, ZFNat.add_sub_cancel]
+  · rw [ZFNat.zero_add,ZFNat.add_lt_add_iff_right]
+    rw [ne_eq,mk_eq,zero_eq,eq,ZFSet.zrel,ZFNat.add_zero,ZFNat.add_zero,←hb,
+      ZFNat.add_left_eq_self,←ne_eq] at nzb
+    exact ZFNat.mod_lt <| pos_of_ne_zero nzb
+  · conv_rhs =>
+      conv=> right ; rw [ZFNat.add_comm]
+      rw [ZFNat.add_assoc, ZFNat.add_comm]
+    rw [ZFNat.add_lt_add_iff_left, ZFNat.add_comm, ZFNat.lt_add_right_iff_pos,
+      ZFNat.add_one_eq_succ, ←ZFNat.lt_le_iff]
+    exact ZFNat.zero_le
+
+noncomputable instance : EuclideanDomain ZFInt where
+  exists_pair_ne := ⟨zero, one, by
+    rw [zero, one, ne_eq, eq, ZFSet.zrel]
+    dsimp only
+    rw [ZFNat.zero_add, ZFNat.add_one_eq_succ,←ne_eq, ne_comm]
+    exact ZFNat.succ_ne_zero 0⟩
+  quotient := (· / ·)
+  quotient_zero := by
+    intro
+    rw [div_eq, div, if_pos <| le_refl 0, if_pos <| le_refl 0, if_pos <| Eq.refl 0]
+    rw [toZFNatP_of_zero,ZFNat.div_zero, ite_self,zero_eq]
+  remainder := (· % ·)
+  quotient_mul_add_remainder_eq := (@mul_div_add_mod_eq · ·)
+  r := (·.absZFNat < ·.absZFNat)
+  r_wellFounded := WellFounded.onFun ZFNat.lt_wf
+  remainder_lt := by
+    intro a b bnz
+    wlog bnn : 0 ≤ b
+    · conv =>
+        congr
+        · rw [mod_neg,]
+        · rw [←absZFNat_neg_eq_absZFNat]
+      rw [not_le,neg_flip_lt] at bnn
+      rw [ne_eq,←neg_zero,eq_comm,neg_eq_comm,←ne_eq] at bnz
+      apply le_of_lt at bnn
+      exact this a bnz bnn
+    replace bnz : 0 < b := by positivity
+    cases a using Quotient.ind
+    cases b using Quotient.ind
+    rename_i a b
+    rw [mod_eq,mod, if_pos bnn, if_pos bnn,←mk_eq,←mk_eq,absZFNat,absZFNat]
+    rw [mk_eq,←le_zero_iff] at bnn
+    rw [mk_eq,←lt_zero_iff,ZFNat.lt_iff_sub_pos] at bnz
+    split_ifs with ann <;> simp_rw [Quotient.liftOn_mk, absZFNat.quot,ZFNat.sub_lt_eq_zero bnn]
+    · rw [ZFNat.zero_sub,ZFNat.sub_zero,ZFNat.add_zero,ZFNat.add_zero]
+      simp_rw [toZFNatP,Quotient.liftOn_mk]
+      exact ZFNat.mod_lt bnz
+    · rw [ZFNat.add_zero]
+      have r : (toZFNatN ⟦a⟧).pred % (toZFNatP ⟦b⟧) + 1 ≤ toZFNatP ⟦b⟧ := by
+        rw [ZFNat.add_one_eq_succ,ZFNat.le_lt_iff]
+        exact ZFNat.mod_lt bnz
+      have h : (toZFNatN ⟦a⟧).pred % (toZFNatP ⟦b⟧) + 1 - toZFNatP ⟦b⟧ = 0 := by
+        rwa [ZFNat.sub_eq_zero_imp_le]
+      rw  [h,ZFNat.add_zero,←ZFNat.add_lt_add_iff_right,ZFNat.sub_add_cancel r,toZFNatP,
+        Quotient.liftOn_mk, ZFNat.lt_add_right_iff_pos,ZFNat.add_one_eq_succ,←ZFNat.lt_le_iff]
+      exact ZFNat.zero_le
+
+  mul_left_not_lt := by
+    intro a b bnz
+    rw [ne_eq,←(@absZFNat_eq_zero_iff b).not,←ne_eq,ne_comm] at bnz
+    apply ZFNat.pos_of_ne_zero at bnz
+    rw [←ZFNat.le_lt_iff,←ZFNat.nat_one_eq] at bnz
+    rw [not_lt, absZFNat_mul_eq_mul_absZFNat,ZFNat.mul_comm]
+    by_cases ha : a = 0
+    · rw [←absZFNat_eq_zero_iff] at ha
+      rw [ha, ZFNat.mul_zero]
+    · rw [←(@absZFNat_eq_zero_iff a).not,←ne_eq,ne_comm] at ha
+      apply ZFNat.pos_of_ne_zero at ha
+      rw [le_mul_iff_one_le_left ha]
+      exact bnz
 end ZFInt
 
 noncomputable abbrev Int := Nat.prod {∅} ∪ ZFSet.prod {∅} Nat
