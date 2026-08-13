@@ -689,6 +689,13 @@ theorem zero_lt_succ {n : ZFNat} : 0 < n.succ := by
   set n := eNat n
   exact Nat.zero_lt_succ _
 
+/--
+Example where the the enat tactic fails provided by Ghilain.
+-/
+example {a b c : ZFNat} (h : 0 < a) (f : ZFNat → Option Unit) : f (a+b) = some ():= by
+  fail_if_success enat
+  sorry
+
 end ZFNat
 end Naturals
 end ZFSet
