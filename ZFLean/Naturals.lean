@@ -156,6 +156,8 @@ lemma nat_zero_eq : (0 : ZFNat) = ⟨∅, zero_in_Nat⟩ := rfl
 instance nat_lt : LT ZFNat := ⟨fun x y => x.val ∈ y.val⟩
 instance nat_le : LE ZFNat := ⟨fun x y => x < y ∨ x = y⟩
 
+lemma lt_def {a b : ZFNat} : a < b ↔ a.val ∈ b.val := by rfl
+
 theorem not_lt_zero {n : ZFNat} : ¬ n < 0 := fun _ => notMem_empty _ ‹_›
 theorem zero_lt_ne_zero {n : ZFNat} : 0 < n → n ≠ 0 := by
   intro h h'
@@ -716,6 +718,8 @@ instance : LinearOrder ZFNat where
   le_total _ _ := le_total
   toDecidableLE := fun _ _ => Classical.propDecidable ((· ≤ ·) _ _)
   lt_iff_le_not_ge _ _ := lt_iff_le_not_ge
+
+instance : PartialOrder ZFNat := ZFNat.instLinearOrder.toPartialOrder
 
 instance : IsStrictTotalOrder ZFNat (·<·) where
   trichotomous x y := by

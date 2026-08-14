@@ -185,8 +185,8 @@ theorem is_func_extend_range {f D E : ZFSet} (hf : IsFunc D E f) {F : ZFSet} (su
 --   `(tactic| apply is_func_extend_range <;> first | (assumption;done) | zpfun)
 
 @[simp, zfun]
-theorem is_func_empty : IsFunc ∅ ∅ ∅ :=
-  ⟨empty_subset (prod ∅ ∅), fun _ h ↦ nomatch h, notMem_empty _⟩
+theorem is_func_empty {A : ZFSet} : IsFunc ∅ A ∅ :=
+  ⟨empty_subset (prod ∅ A), fun _ h ↦ nomatch h, notMem_empty _⟩
 
 theorem is_pfunc_func_exists {f A B : ZFSet} :
     f.IsPFunc A B → ∃ A' B', IsFunc A' B' f ∧ A' ⊆ A ∧ B' ⊆ B := by
@@ -283,6 +283,29 @@ theorem is_func_of_pfunc (f : ZFSet) {A B} (hf : f.IsPFunc A B) : IsFunc f.Dom B
 
 def IsInjective (f : ZFSet) {A B : ZFSet} (hf : IsFunc A B f := by zfun) :=
   ∀ x y z, x ∈ A → y ∈ A → z ∈ B → x.pair z ∈ f → y.pair z ∈ f → x = y
+
+/--
+The definition of IsInjective can be simplified, since some of the hypothesis
+are redundant with the fact that f is a function (and thus a relation).
+
+One might also consider to remove entirely the `hf` hypothesis since the
+definition of being injective can be generalized to all sets. By doing that
+being injective is the dual of being (partially) functional.
+
+To have definition of injective functions one might write:
+∀ (x₁ x₂ y₁ y₂ : ZFSet), x₁.pair y₁ ∈ f → (x₁.pair y₂ → y₁ = y₂) ∧ (x₂.pair y₁ → x₁ = x₂)
+-/
+lemma IsInjective_iff {f A B : ZFSet} (hf : IsFunc A B f := by zpfun) :
+    f.IsInjective ↔ ∀ (x₁ x₂ y : ZFSet), x₁.pair y ∈ f ∧ x₂.pair y ∈ f → x₁ = x₂ := by
+  constructor
+  · rintro h x₁ x₂ y ⟨x₁y_in_f, x₂y_in_f⟩
+    have toDom {x : ZFSet} (xy_in_f : x.pair y ∈ f): x ∈ A :=
+      And.left <| pair_mem_prod.mp <| (is_rel_of_is_func hf) xy_in_f
+    have toRan {x : ZFSet} (xy_in_f : x.pair y ∈ f): y ∈ B :=
+      And.right <| pair_mem_prod.mp <| (is_rel_of_is_func hf) xy_in_f
+    exact h x₁ x₂ y (toDom x₁y_in_f) (toDom x₂y_in_f) (toRan x₁y_in_f) x₁y_in_f x₂y_in_f
+  · intro h x₁ x₂ y _ _ _ x₁y_in_f x₂y_in_f
+    exact h x₁ x₂ y ⟨x₁y_in_f, x₂y_in_f⟩
 
 def IsSurjective (f : ZFSet) {A B : ZFSet} (hf : IsFunc A B f := by zfun) :=
   ∀ y ∈ B, ∃ x ∈ A, x.pair y ∈ f
@@ -740,6 +763,15 @@ theorem fapply.of_pair {f A B : ZFSet} (hf : f.IsPFunc A B) {x y : ZFSet} (hxy :
   have spec := Classical.choose_spec y_def |>.2
   obtain ⟨w, xw, uniq⟩ := IsPFunc.exists_unique_of_mem_dom hf (mem_dom hf hxy)
   exact uniq _ hxy ▸ uniq _ spec
+
+theorem fapply_iff {A B x y f : ZFSet} (hf : f.IsPFunc A B := by zpfun)
+    (x_in_dom : x ∈ f.Dom) :
+    y = fapply f hf ⟨x, x_in_dom⟩ ↔ x.pair y ∈ f := by
+  constructor
+  · rintro rfl
+    exact fapply.def hf x_in_dom
+  · intro xy_related_f
+    rw [fapply.of_pair hf xy_related_f]
 
 theorem IsPFunc.supset_of_range {f A B : ZFSet} (hf : f.IsPFunc A B) : f.Range ⊆ B := by
   intro y y_B
@@ -2835,5 +2867,165 @@ theorem fprod_injective_of_injective {A B A' B' φ ψ : ZFSet}
     rfl
 
 end Auxiliary
+
+section Restriction
+
+-- TODO these already exist in `Set`, but there is a problem with coercion
+lemma inter_subset_left {A B : ZFSet} : A ∩ B ⊆ A := by
+  rw [ZFSet.subset_def]
+  intro z  z_in_inter
+  rw [mem_inter] at z_in_inter
+  exact z_in_inter.left
+lemma inter_subset_right {A B : ZFSet} : A ∩ B ⊆ B := by
+  rw [ZFSet.subset_def]
+  intro z  z_in_inter
+  rw [mem_inter] at z_in_inter
+  exact z_in_inter.right
+
+def Restr (f : ZFSet) {A B : ZFSet} (hf : f.IsPFunc A B := by zpfun) (C : ZFSet) :=
+  f ∩ (C.prod B)
+def Corestr (f : ZFSet) {A B : ZFSet} (hf : f.IsPFunc A B := by zpfun) (C : ZFSet) :=
+  f ∩ (A.prod C)
+
+@[zpfun]
+theorem IsPFunc_Restr (f : ZFSet) {A B : ZFSet} (hf : f.IsPFunc A B := by zpfun) (C : ZFSet) :
+    (f.Restr hf C).IsPFunc C B := by
+  unfold IsPFunc
+  constructor
+  · exact inter_subset_right
+  · intro x y x_y_related_frestr z x_z_related_frestr
+    unfold Restr at x_y_related_frestr x_z_related_frestr
+    rw [mem_inter] at x_y_related_frestr x_z_related_frestr
+    have x_y_related_f := x_y_related_frestr.left
+    have x_z_related_f := x_z_related_frestr.left
+    exact hf.right x y x_y_related_f z x_z_related_f
+
+@[zfun]
+theorem IsFunc_Restr_of_IsFunc (f : ZFSet) {A B : ZFSet} (hf : A.IsFunc B f := by zfun)
+  {C : ZFSet} (C_sub_A : C ⊆ A) :
+  (C.IsFunc B <| f.Restr (is_func_is_pfunc hf) C) := by
+  constructor
+  · exact is_rel_of_is_pfunc <| IsPFunc_Restr f (is_func_is_pfunc hf) C
+  · intro z z_in_C
+    unfold IsFunc at hf
+    obtain ⟨f_relation , f_functional⟩ := hf
+    specialize f_functional z <| C_sub_A z_in_C
+    obtain ⟨w, w_prop, w_uniq⟩ := f_functional
+    exists w
+    constructor
+    · beta_reduce
+      unfold Restr
+      rw [mem_inter, pair_mem_prod]
+      and_intros
+      · exact w_prop
+      · exact z_in_C
+      · apply And.right
+        rw [← pair_mem_prod]
+        exact f_relation w_prop
+    · intro y  z_y_related
+      apply inter_subset_left at z_y_related
+      exact w_uniq y z_y_related
+
+@[zpfun]
+theorem IsPFunc_Corestr (f : ZFSet) {A B : ZFSet} (hf : f.IsPFunc A B := by zpfun) (C : ZFSet) :
+    (f.Corestr hf C).IsPFunc A C := by
+  unfold IsPFunc
+  constructor
+  · exact inter_subset_right
+  · intro x y x_y_related_frestr z x_z_related_frestr
+    unfold Corestr at x_y_related_frestr x_z_related_frestr
+    rw [mem_inter] at x_y_related_frestr x_z_related_frestr
+    have x_y_related_f := x_y_related_frestr.left
+    have x_z_related_f := x_z_related_frestr.left
+    exact hf.right x y x_y_related_f z x_z_related_f
+
+@[zfun]
+theorem IsFunc_Corestr_of_IsFunc (f : ZFSet) {A B : ZFSet} (hf : A.IsFunc B f := by zfun)
+  (C : ZFSet) (B_sub_C : B ⊆ C) :
+  (A.IsFunc C <| f.Corestr (is_func_is_pfunc hf) C) := by
+  constructor
+  · exact is_rel_of_is_pfunc <| IsPFunc_Corestr f (is_func_is_pfunc hf) C
+  · intro z z_in_A
+    unfold IsFunc at hf
+    obtain ⟨f_relation , f_functional⟩ := hf
+    specialize f_functional z z_in_A
+    obtain ⟨w, w_prop, w_uniq⟩ := f_functional
+    exists w
+    constructor
+    · beta_reduce
+      unfold Corestr
+      rw [mem_inter, pair_mem_prod]
+      and_intros
+      · exact w_prop
+      · exact z_in_A
+      · apply B_sub_C
+        apply And.right
+        rw [← pair_mem_prod]
+        exact f_relation w_prop
+    · intro y  z_y_related
+      apply inter_subset_left at z_y_related
+      exact w_uniq y z_y_related
+
+theorem mem_Restr_iff (f : ZFSet) {A B : ZFSet} (hf : f.IsPFunc A B := by zpfun)
+  {C : ZFSet} (C_sub_A : C ⊆ A) (x y : ZFSet) :
+    x.pair y ∈ f.Restr hf C ↔ x.pair y ∈ f ∧ x ∈ C := by
+  constructor
+  · intro x_y_related
+    apply And.left
+    rwa [and_assoc, ←pair_mem_prod, ←mem_inter]
+  · rintro ⟨x_y_related, x_in_C⟩
+    erw [mem_inter, pair_mem_prod]
+    and_intros
+    · exact x_y_related
+    · exact x_in_C
+    · apply @And.right <| x ∈ A
+      rw [←pair_mem_prod]
+      apply is_rel_of_is_pfunc hf
+      exact x_y_related
+
+@[zfun]
+theorem isFunc_of_iUnion_of_isFunc (f : I → ZFSet) (fdom : I → ZFSet) (fran : I → ZFSet)
+  (ffun : ∀ i, (fdom i).IsFunc (fran i) (f i)) (fcongr : ∀ i j, (f i) ⊆ (f j) ∨ (f j) ⊆ (f i)) :
+    (⋃ i, fdom i).IsFunc (⋃ i, fran i) (⋃ i, f i) := by
+  constructor
+  · intro z
+    simp_rw [mem_prod,mem_iUnion]
+    rintro ⟨i, z_in_fi⟩
+    obtain ⟨x, x_in_fdom, y, y_in_fran, rfl⟩ :=
+      mem_prod.mp <| (is_rel_of_is_func <| ffun i)  z_in_fi
+    exists x, ⟨i, x_in_fdom⟩, y, ⟨i, y_in_fran⟩
+  · intro x
+    simp_rw [mem_iUnion]
+    rintro ⟨i, x_in_dom⟩
+    apply existsUnique_of_exists_of_unique
+    · obtain ⟨y,xy_in_fi⟩ := ExistsUnique.exists <| (ffun i).right x x_in_dom
+      exists y, i
+    · rintro y₁ y₂ ⟨i₁,xy₁_in_fi₁⟩ ⟨i₂,xy₂_in_fi₂⟩
+      wlog ordered : f i₁ ⊆  f i₂ generalizing y₁ y₂ i₁ i₂
+      · exact Eq.symm
+          <| this y₂ y₁ i₂ xy₂_in_fi₂ i₁ xy₁_in_fi₁
+          <| (fcongr i₁ i₂).resolve_left ordered
+      apply ordered at xy₁_in_fi₁
+      replace x_in_dom := And.left <| pair_mem_prod.mp <| (is_rel_of_is_func <| ffun i₂) xy₂_in_fi₂
+      apply ExistsUnique.unique <| (ffun i₂).right x x_in_dom
+      · exact xy₁_in_fi₁
+      · exact xy₂_in_fi₂
+
+theorem isInjective_of_iUnion_of_isInjective (f : I → ZFSet) (fdom : I → ZFSet) (fran : I → ZFSet)
+  (ffun : ∀ i, (fdom i).IsFunc (fran i) (f i)) (fcongr : ∀ i j, (f i) ⊆ (f j) ∨ (f j) ⊆ (f i))
+  (finj : ∀ i, (f i).IsInjective) (hf : (⋃ i, fdom i).IsFunc (⋃ i, fran i) (⋃ i, f i)) :
+    (⋃ i, f i).IsInjective hf := by
+  rw [IsInjective_iff <| isFunc_of_iUnion_of_isFunc f fdom fran ffun fcongr]
+  intro x₁ x₂ y
+  simp_rw [mem_iUnion]
+  rintro ⟨⟨i₁, x₁y_in_f⟩, i₂, x₂y_in_f⟩
+  wlog ordered : f i₁ ⊆ f i₂
+  · exact Eq.symm
+      <| this f fdom fran ffun fcongr finj hf x₂ x₁ y i₂ x₂y_in_f i₁ x₁y_in_f
+      <| (fcongr i₁ i₂).resolve_left ordered
+  apply ordered at x₁y_in_f
+  exact (IsInjective_iff <| ffun i₂).mp (finj i₂) x₁ x₂ y ⟨x₁y_in_f, x₂y_in_f⟩
+
+end Restriction
 
 end ZFSet
