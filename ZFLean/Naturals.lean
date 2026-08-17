@@ -203,6 +203,41 @@ theorem succ_mem_Nat' {n} (h : n ∈ Nat) : insert n n ∈ Nat := by
   · exact some_inf_powerset_sep_inductive_nonempty
 
 /--
+`Nat` is the least inductive set: it is contained in *every* inductive set, with no
+restriction to subsets of `some_inf`.
+
+This is the unrestricted form of `inductive_subset_some_inf_contains_Nat`; the extra
+hypothesis `a ⊆ some_inf` is eliminated by intersecting `a` with `some_inf` first.
+-/
+theorem Nat_subset_of_inductive {a : ZFSet} (h : inductive_set a) : Nat ⊆ a := by
+  have hb : inductive_set (some_inf.sep (· ∈ a)) :=
+    inductive_sep _ inductive_some_inf h.left fun n _ hn => h.right n hn
+  intro n hn
+  exact mem_sep.mp (inductive_subset_some_inf_contains_Nat hb sep_subset_self hn) |>.right
+
+/--
+The definition of `Nat` is independent of the witness granted by the axiom of infinity:
+intersecting the inductive subsets of *any* inductive set `T` yields the same set `Nat`.
+
+In particular `Nat = ⋂₀ ((powerset ω).sep inductive_set)`, so seeding the construction with
+`some_inf` rather than `ω` is a choice without observable consequence.
+-/
+theorem Nat_eq_of_inductive {T : ZFSet} (hT : inductive_set T) :
+    Nat = ⋂₀ ((powerset T).sep inductive_set) := by
+  have Nat_ind : inductive_set Nat := ⟨zero_in_Nat, fun _ _ => succ_mem_Nat' ‹_›⟩
+  have hne : ((powerset T).sep inductive_set).Nonempty :=
+    ⟨T, mem_sep.mpr ⟨mem_powerset.mpr fun _ => id, hT⟩⟩
+  ext n
+  constructor
+  · intro hn
+    rw [mem_sInter hne]
+    intro y hy
+    exact Nat_subset_of_inductive (mem_sep.mp hy).right hn
+  · intro hn
+    rw [mem_sInter hne] at hn
+    exact hn Nat <| mem_sep.mpr ⟨mem_powerset.mpr (Nat_subset_of_inductive hT), Nat_ind⟩
+
+/--
 The successor function `succ` is build from the insertion of a set into itself embedded into the
 `ZFNat` type.
 -/
