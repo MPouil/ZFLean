@@ -1,5 +1,6 @@
 import ZFLean.Booleans
 import ZFLean.Integers
+import ZFLean.IntegerDivision
 import ZFLean.Rationals
 import ZFLean.Embeddings
 import ZFLean.Isomorphisms
