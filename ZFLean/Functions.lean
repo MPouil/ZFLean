@@ -665,6 +665,42 @@ theorem is_func_dom_eq {f A B : ZFSet} (hf : IsFunc A B f := by zfun) : f.Dom = 
       · exact hf.1 hy |> pair_mem_prod.mp |>.2
       · exact hy
 
+/-! ### Seed lemmas for the `zdom` tactic
+
+`is_func_dom_eq` is an equation, so `solve_by_elim` — which only ever `apply`s a lemma's
+conclusion — cannot use it. The following elimination-shaped lemmas are its membership
+counterparts, and are what makes `zdom` able to close the side conditions of `@ᶻ`. -/
+
+/--
+Membership form of `is_func_dom_eq`: the domain of a function `IsFunc A B f` contains every
+element of `A`.
+-/
+@[zdom]
+theorem mem_dom_of_mem {f A B : ZFSet} (hf : IsFunc A B f) {x : ZFSet} (hx : x ∈ A) :
+    x ∈ Dom f (is_rel_of_is_func hf) := by rwa [is_func_dom_eq hf]
+
+/-- Converse of `mem_dom_of_mem`: the domain of a partial function is contained in its source. -/
+@[zdom]
+theorem mem_of_mem_dom {f A B : ZFSet} (hf : f.IsPFunc A B) {x : ZFSet} (hx : x ∈ f.Dom) : x ∈ A :=
+  pfun_dom_subset f hf hx
+
+/-- Introduction form of `pair_mem_prod`. -/
+@[zdom]
+theorem pair_mem_prod_of_mem {A B a b : ZFSet} (ha : a ∈ A) (hb : b ∈ B) :
+    a.pair b ∈ A.prod B := pair_mem_prod.mpr ⟨ha, hb⟩
+
+/-- Introduction form of `mem_funs`. -/
+@[zdom]
+theorem mem_funs_of_is_func {A B f : ZFSet} (hf : IsFunc A B f) : f ∈ A.funs B :=
+  mem_funs.mpr hf
+
+/-- Introduction form of `mem_powerset`. -/
+@[zdom]
+theorem mem_powerset_of_subset {A B : ZFSet} (h : A ⊆ B) : A ∈ B.powerset :=
+  mem_powerset.mpr h
+
+attribute [zdom] Subtype.property
+
 open Classical in
 theorem fapply_Id {A x : ZFSet} (hx : x ∈ A) :
     @ᶻ𝟙A ⟨x, by rwa [is_func_dom_eq Id.IsFunc]⟩ = ⟨x, hx⟩ := by
@@ -675,6 +711,7 @@ theorem fapply_Id {A x : ZFSet} (hx : x ∈ A) :
   congr
   rw [←mem_id]
 
+@[zdom]
 theorem fapply_mem_range {f A B : ZFSet} (hf : f.IsPFunc A B) {x : ZFSet} (hx : x ∈ f.Dom) :
     (@ᶻf ⟨x, hx⟩).val ∈ B := by
   apply Subtype.property
@@ -1010,8 +1047,14 @@ theorem lambda_isFunc {A B : ZFSet} {f : ZFSet → ZFSet} (hf : ∀ {x}, x ∈ A
       rw [lambda_spec] at hy
       exact hy.2.2
 
+@[zdom]
 theorem mem_funs_of_lambda {A B : ZFSet} {f : ZFSet → ZFSet} (hf : ∀ {x}, x ∈ A → f x ∈ B) :
   lambda A B f ∈ A.funs B := mem_funs.mpr <| lambda_isFunc hf
+
+-- `lambda_isFunc` / `lambda_subset` are the canonical producers for `λᶻ`; registering them
+-- lets `zfun`/`zrel` (and hence `zdom`) discharge side conditions about lambda terms.
+attribute [zfun] lambda_isFunc
+attribute [zrel] lambda_subset
 
 theorem fapply_lambda {A B : ZFSet} {f : ZFSet → ZFSet}
   (hf : ∀ {x}, x ∈ A → f x ∈ B) {a : ZFSet} (ha : a ∈ A) :
