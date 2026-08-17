@@ -1484,6 +1484,13 @@ instance : Semiring ZFNat where
 instance : CommSemiring ZFNat where
   mul_comm := mul_comm
 
+/--
+The `CommSemiring` instance makes Mathlib's `ring` normalisation available on `ZFNat`.
+Here `^` is the monoid power with exponent in `ℕ`, while the coefficient `2` is the
+`ZFNat` numeral obtained from `Nat.cast`.
+-/
+example (a b : ZFNat) : (a+b)^2 = a^2 + 2*a*b + b^2 := by ring
+
 instance : Std.Associative (α := ZFNat) (· + ·) := ⟨(ZFNat.add_assoc · · · |>.symm)⟩
 instance : Std.Commutative (α := ZFNat) (· + ·) := ⟨ZFNat.add_comm⟩
 
