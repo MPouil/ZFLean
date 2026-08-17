@@ -1758,8 +1758,10 @@ theorem IsFunc.range_eq_of_surjective {f A B : ZFSet} (hf : IsFunc A B f)
       · exact ZFSet.mem_dom (is_func_is_pfunc hf) xy
       · exact xy
 
-attribute [-instance] ZFSet.instPartialOrder
-
+-- `ZFSet.instPartialOrder` induces a subset-based order on `{x // x ∈ n}`, which would clash
+-- with the numeric order below. Since Mathlib derives `⊆` on `ZFSet` from that instance, the
+-- removal is scoped to this declaration only.
+attribute [-instance] ZFSet.instPartialOrder in
 @[reducible]
 def instPreorder_mem_Nat {n : ZFSet} (hn : n ∈ Nat) : Preorder {x // x ∈ n} where
   le := fun ⟨a, ha⟩ ⟨b, hb⟩ ↦

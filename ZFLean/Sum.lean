@@ -427,6 +427,9 @@ theorem funs_coprod_universal {A B X f g : ZFSet}
 
 end Sum
 
+/-- `Option S` is the disjoint sum `{∅} ⊎ S`. Marked reducible so that the two spellings
+stay interchangeable under `rw` and `simp`. -/
+@[reducible]
 def Option (S : ZFSet) := {∅} ⊎ S
 
 instance {T : ZFSet} : Nonempty (Option T) := ⟨Sum.inl ⟨∅, mem_singleton.mpr rfl⟩⟩
@@ -684,13 +687,25 @@ theorem flift_bijective {f A B : ZFSet} (hf : IsFunc A B f) :
       specialize hinj (Option.some ⟨x, hx⟩).val (Option.some ⟨y, hy⟩).val (Option.some ⟨z, hz⟩).val
         (SetLike.coe_mem _) (SetLike.coe_mem _) (SetLike.coe_mem _) ?_ ?_
       · rw [flift, lambda_spec]
-        simp only [SetLike.coe_mem, ↓reduceDIte, Subtype.coe_eta, some.injEq, exists_eq',
-          Classical.choose_eq', SetLike.coe_eq_coe, true_and]
-        exact congrArg (Option.some (S := B)) (fapply.of_pair _ xz).symm
+        refine ⟨SetLike.coe_mem _, SetLike.coe_mem _, ?_⟩
+        split_ifs with h1 h2
+        · have hc : Classical.choose h2 = ⟨x, hx⟩ :=
+            Option.some.injEq.mp (Classical.choose_spec h2).symm
+          simp only [hc]
+          exact Subtype.ext_iff.mp <|
+            congrArg (Option.some (S := B)) (fapply.of_pair _ xz).symm
+        · exact absurd ⟨⟨x, hx⟩, rfl⟩ h2
+        · exact absurd (SetLike.coe_mem _) h1
       · rw [flift, lambda_spec]
-        simp only [SetLike.coe_mem, ↓reduceDIte, Subtype.coe_eta, some.injEq, exists_eq',
-          Classical.choose_eq', SetLike.coe_eq_coe, true_and]
-        exact congrArg (Option.some (S := B)) (fapply.of_pair _ yz).symm
+        refine ⟨SetLike.coe_mem _, SetLike.coe_mem _, ?_⟩
+        split_ifs with h1 h2
+        · have hc : Classical.choose h2 = ⟨y, hy⟩ :=
+            Option.some.injEq.mp (Classical.choose_spec h2).symm
+          simp only [hc]
+          exact Subtype.ext_iff.mp <|
+            congrArg (Option.some (S := B)) (fapply.of_pair _ yz).symm
+        · exact absurd ⟨⟨y, hy⟩, rfl⟩ h2
+        · exact absurd (SetLike.coe_mem _) h1
       · exact Subtype.ext_iff.mp <| Option.some.injEq.mp <| Subtype.ext_iff.mpr hinj
     · intro y hy
       have : (Option.some ⟨y, hy⟩).val ∈ Option.toZFSet B :=
@@ -704,8 +719,7 @@ theorem flift_bijective {f A B : ZFSet} (hf : IsFunc A B f) :
         and_intros
         · apply SetLike.coe_mem
         · apply fapply.def
-      · rw [←Subtype.ext_iff] at eq
-        nomatch ZFSet.Option.some_ne_none _ eq
+      · nomatch ZFSet.Option.some_ne_none _ (Subtype.val_inj.mp eq)
   mpr := by
     intro hbij
     rw [bijective_exists1_iff] at hbij ⊢
@@ -715,22 +729,20 @@ theorem flift_bijective {f A B : ZFSet} (hf : IsFunc A B f) :
     · use (@none A).val
       and_intros
       · apply SetLike.coe_mem
-      · rw [flift, lambda_spec, dite_cond_eq_true (eq_true (SetLike.coe_mem _))]
-        and_intros
-        · apply SetLike.coe_mem
-        · apply SetLike.coe_mem
-        · split_ifs with isnone
-          · obtain ⟨_, contr⟩ := isnone
-            change none = some _ at contr
-            nomatch ZFSet.Option.some_ne_none _ contr.symm
-          · rfl
+      · rw [flift, lambda_spec]
+        refine ⟨SetLike.coe_mem _, SetLike.coe_mem _, ?_⟩
+        split_ifs with h1 isnone
+        · obtain ⟨_, contr⟩ := isnone
+          change none = some _ at contr
+          nomatch ZFSet.Option.some_ne_none _ contr.symm
+        · rfl
+        · exact absurd (SetLike.coe_mem _) h1
       · rintro y ⟨hy, pair⟩
         rw [flift, lambda_spec] at pair
         obtain ⟨-, -, eq⟩ := pair
         rw [dite_cond_eq_true (eq_true hy)] at eq
         split_ifs at eq with issome
-        · rw [←Subtype.ext_iff] at eq
-          nomatch ZFSet.Option.some_ne_none _ eq.symm
+        · nomatch ZFSet.Option.some_ne_none _ (Subtype.val_inj.mp eq).symm
         · have := @ZFSet.Option.ne_none_is_some _ ⟨y, hy⟩
           rw [imp_iff_not issome, not_not] at this
           exact Subtype.ext_iff.mp this
@@ -738,20 +750,19 @@ theorem flift_bijective {f A B : ZFSet} (hf : IsFunc A B f) :
       use (Option.some ⟨x, hx⟩).val
       and_intros
       · apply SetLike.coe_mem
-      · rw [flift, lambda_spec, dite_cond_eq_true (eq_true (SetLike.coe_mem _))]
-        and_intros
-        · apply SetLike.coe_mem
-        · apply SetLike.coe_mem
-        · split_ifs with isnone
-          · have := Classical.choose_spec isnone
-            change some _ = some _ at this
-            rw [Option.some.injEq, Subtype.ext_iff] at this
-            dsimp at this
-            refine Subtype.ext_iff.mp (congrArg (Option.some (S := B)) ?_)
-            symm
-            apply fapply.of_pair
-            rwa [this] at fxy
-          · simp only [Subtype.coe_eta, exists_apply_eq_apply', not_true_eq_false] at isnone
+      · rw [flift, lambda_spec]
+        refine ⟨SetLike.coe_mem _, SetLike.coe_mem _, ?_⟩
+        split_ifs with h1 isnone
+        · have := Classical.choose_spec isnone
+          change some _ = some _ at this
+          rw [Option.some.injEq, Subtype.ext_iff] at this
+          dsimp at this
+          refine Subtype.ext_iff.mp (congrArg (Option.some (S := B)) ?_)
+          symm
+          apply fapply.of_pair
+          rwa [this] at fxy
+        · exact absurd ⟨⟨x, hx⟩, rfl⟩ isnone
+        · exact absurd (SetLike.coe_mem _) h1
       · rintro z ⟨hz, fzy⟩
         rw [flift, lambda_spec] at fzy
         obtain ⟨-, -, eq⟩ := fzy
@@ -768,8 +779,7 @@ theorem flift_bijective {f A B : ZFSet} (hf : IsFunc A B f) :
           symm
           have := IsInjective.apply_inj hf hbij.1 this
           rwa [Subtype.ext_iff] at this ⊢
-        · rw [←Subtype.ext_iff] at eq
-          nomatch ZFSet.Option.some_ne_none _ eq
+        · nomatch ZFSet.Option.some_ne_none _ (Subtype.val_inj.mp eq)
 
 end Option
 

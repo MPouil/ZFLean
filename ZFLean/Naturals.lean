@@ -354,7 +354,7 @@ lemma ind {P : ZFSet → Prop} (n : ZFSet)
 theorem induction {P : ZFNat → Prop} (n : ZFNat)
   (zero : P 0) (succ : ∀ n, P n → P (succ n)) : P n := by classical
   let ⟨n, hn⟩ := n
-  let P' x := if hx : x ∈ Nat then P ⟨x, hx⟩ else unreachable!
+  let P' x := if hx : x ∈ Nat then P ⟨x, hx⟩ else PUnit
   have : P' n = P ⟨n, hn⟩ := dif_pos hn
   rw [← this]
   apply @ind P' n hn
@@ -679,7 +679,7 @@ definitions over natural numbers to be defined in a more natural way.
 def rec.{u} {motive : ZFNat → Sort u} (n : ZFNat)
   (zero : motive 0) (succ : Π x, motive x → motive (succ x)) : motive n := by classical
   let ⟨n, hn⟩ := n
-  let motive' (x : ZFSet) := if hx : x ∈ Nat then motive ⟨x, hx⟩ else unreachable!
+  let motive' (x : ZFSet) := if hx : x ∈ Nat then motive ⟨x, hx⟩ else PUnit
   have : motive' n = motive ⟨n, hn⟩ := dif_pos hn
   rw [← this]
   apply @ZFNat.rec' motive' n hn
@@ -706,6 +706,7 @@ theorem rec_succ.{u} {motive : ZFNat → Sort u} (n : ZFNat)
   (zero : motive 0) (succ' : Π x, motive x → motive (succ x)) :
   rec (succ n) zero succ' = succ' n (ZFNat.rec n zero succ') := by
     simp [ZFNat.rec, succ, ZFNat.rec'_succ _ n.property]
+    exact eq_of_heq (HEq.trans (cast_heq _ _) (cast_heq _ _))
 
 /--
 Uniqueness half of the universal property of `ZFNat`: `ZFNat.rec` is the *only* family
