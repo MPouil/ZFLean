@@ -665,9 +665,45 @@ theorem is_func_dom_eq {f A B : ZFSet} (hf : IsFunc A B f := by zfun) : f.Dom = 
       · exact hf.1 hy |> pair_mem_prod.mp |>.2
       · exact hy
 
+/-! ### Seed lemmas for the `zdom` tactic
+
+`is_func_dom_eq` is an equation, so `solve_by_elim` — which only ever `apply`s a lemma's
+conclusion — cannot use it. The following elimination-shaped lemmas are its membership
+counterparts, and are what makes `zdom` able to close the side conditions of `@ᶻ`. -/
+
+/--
+Membership form of `is_func_dom_eq`: the domain of a function `IsFunc A B f` contains every
+element of `A`.
+-/
+@[zdom]
+theorem mem_dom_of_mem {f A B : ZFSet} (hf : IsFunc A B f) {x : ZFSet} (hx : x ∈ A) :
+    x ∈ Dom f (is_rel_of_is_func hf) := by rwa [is_func_dom_eq hf]
+
+/-- Converse of `mem_dom_of_mem`: the domain of a partial function is contained in its source. -/
+@[zdom]
+theorem mem_of_mem_dom {f A B : ZFSet} (hf : f.IsPFunc A B) {x : ZFSet} (hx : x ∈ f.Dom) : x ∈ A :=
+  pfun_dom_subset f hf hx
+
+/-- Introduction form of `pair_mem_prod`. -/
+@[zdom]
+theorem pair_mem_prod_of_mem {A B a b : ZFSet} (ha : a ∈ A) (hb : b ∈ B) :
+    a.pair b ∈ A.prod B := pair_mem_prod.mpr ⟨ha, hb⟩
+
+/-- Introduction form of `mem_funs`. -/
+@[zdom]
+theorem mem_funs_of_is_func {A B f : ZFSet} (hf : IsFunc A B f) : f ∈ A.funs B :=
+  mem_funs.mpr hf
+
+/-- Introduction form of `mem_powerset`. -/
+@[zdom]
+theorem mem_powerset_of_subset {A B : ZFSet} (h : A ⊆ B) : A ∈ B.powerset :=
+  mem_powerset.mpr h
+
+attribute [zdom] Subtype.property
+
 open Classical in
 theorem fapply_Id {A x : ZFSet} (hx : x ∈ A) :
-    @ᶻ𝟙A ⟨x, by rwa [is_func_dom_eq Id.IsFunc]⟩ = ⟨x, hx⟩ := by
+    @ᶻ𝟙A ⟨x, by zdom⟩ = ⟨x, hx⟩ := by
   rw [fapply]
   generalize_proofs choose _
   obtain ⟨_, mem_id⟩ := choose_spec choose
@@ -675,6 +711,7 @@ theorem fapply_Id {A x : ZFSet} (hx : x ∈ A) :
   congr
   rw [←mem_id]
 
+@[zdom]
 theorem fapply_mem_range {f A B : ZFSet} (hf : f.IsPFunc A B) {x : ZFSet} (hx : x ∈ f.Dom) :
     (@ᶻf ⟨x, hx⟩).val ∈ B := by
   apply Subtype.property
@@ -691,8 +728,8 @@ set_option linter.auxLemma false in
 theorem IsInjective.apply_inj {f A B : ZFSet} (hf : IsFunc A B f) (inj : f.IsInjective) :
     Function.Injective @ᶻf := by classical
   rintro ⟨x, x_dom⟩ ⟨y, y_dom⟩ h
-  have x_A : x ∈ A := by rwa [is_func_dom_eq hf] at x_dom
-  have y_A : y ∈ A := by rwa [is_func_dom_eq hf] at y_dom
+  have x_A : x ∈ A := by zdom
+  have y_A : y ∈ A := by zdom
   obtain ⟨pair_x_ε, unq_fx⟩ := Classical.choose_spec <| hf.right x x_A
   obtain ⟨pair_y_ε, unq_fy⟩ := Classical.choose_spec <| hf.right y y_A
   congr
@@ -700,7 +737,7 @@ theorem IsInjective.apply_inj {f A B : ZFSet} (hf : IsFunc A B f) (inj : f.IsInj
   injection h with h
   generalize_proofs hpf hpf' at h
   have choose_eq {z} (z_dom : z ∈ f.Dom) :
-      Classical.choose (hf.right z (is_func_dom_eq hf ▸ z_dom)) =
+      Classical.choose (hf.right z (by zdom)) =
       Classical.choose (fapply._proof_1 f (is_func_is_pfunc hf) z z_dom) := by
     congr
     funext w
@@ -711,7 +748,7 @@ theorem IsInjective.apply_inj {f A B : ZFSet} (hf : IsFunc A B f) (inj : f.IsInj
       rcases pair_inj.mp eq with ⟨rfl, rfl⟩
       exact ⟨l, pair_z_w⟩
     · rintro ⟨_, pair_z_w⟩
-      obtain ⟨a,pair_z_a,unq_a⟩ := hf.right z (is_func_dom_eq hf ▸ z_dom)
+      obtain ⟨a,pair_z_a,unq_a⟩ := hf.right z (by zdom)
       exact ⟨pair_z_w, by intro w' pair_x_w'; rw [unq_a w' pair_x_w', unq_a w pair_z_w]⟩
   apply inj x y (Classical.choose <| hf.right x x_A) x_A y_A
   · exact choose_eq x_dom ▸ fapply_mem_range (is_func_is_pfunc hf) x_dom
@@ -958,7 +995,7 @@ theorem lambda_ext_iff' {d₁ d₂ r₁ r₂ : ZFSet} {f₁ f₂ : ZFSet → ZFS
 open Classical in
 theorem lambda_eta {A B : ZFSet} {f : ZFSet} (hf : A.IsFunc B f) :
   f = (λᶻ : A → B
-          | x ↦ if hx : x ∈ A then @ᶻf ⟨x, by rwa [is_func_dom_eq hf]⟩ else ∅)
+          | x ↦ if hx : x ∈ A then @ᶻf ⟨x, by zdom⟩ else ∅)
     := by
   ext1 z
   constructor <;> intro hz
@@ -974,7 +1011,7 @@ theorem lambda_eta {A B : ZFSet} {f : ZFSet} (hf : A.IsFunc B f) :
 theorem is_func_ext_iff {A B : ZFSet} {f g : ZFSet} (hf : IsFunc A B f) (hg : IsFunc A B g) :
     f = g ↔ (∀ x,
       (hx : x ∈ A) →
-      @ᶻf ⟨x, by rwa [is_func_dom_eq]⟩ = @ᶻg ⟨x, by rwa [is_func_dom_eq]⟩)
+      @ᶻf ⟨x, by zdom⟩ = @ᶻg ⟨x, by zdom⟩)
 where
   mp := by
     rintro rfl
@@ -1010,13 +1047,19 @@ theorem lambda_isFunc {A B : ZFSet} {f : ZFSet → ZFSet} (hf : ∀ {x}, x ∈ A
       rw [lambda_spec] at hy
       exact hy.2.2
 
+@[zdom]
 theorem mem_funs_of_lambda {A B : ZFSet} {f : ZFSet → ZFSet} (hf : ∀ {x}, x ∈ A → f x ∈ B) :
   lambda A B f ∈ A.funs B := mem_funs.mpr <| lambda_isFunc hf
+
+-- `lambda_isFunc` / `lambda_subset` are the canonical producers for `λᶻ`; registering them
+-- lets `zfun`/`zrel` (and hence `zdom`) discharge side conditions about lambda terms.
+attribute [zfun] lambda_isFunc
+attribute [zrel] lambda_subset
 
 theorem fapply_lambda {A B : ZFSet} {f : ZFSet → ZFSet}
   (hf : ∀ {x}, x ∈ A → f x ∈ B) {a : ZFSet} (ha : a ∈ A) :
     fapply (λᶻ : A → B | x ↦ f x) (is_func_is_pfunc <| lambda_isFunc hf)
-      ⟨a, by rwa [is_func_dom_eq (lambda_isFunc hf)]⟩ = f a := by
+      ⟨a, by zdom⟩ = f a := by
   rw [fapply]
   generalize_proofs choose_y y_mem_B
   have y_def := Classical.choose_spec choose_y |>.2
@@ -1045,7 +1088,7 @@ theorem inv_is_func_of_injective {f A B : ZFSet} {f_is_func : A.IsFunc B f}
       · exact hb
       · use a
         and_intros
-        · rwa [is_func_dom_eq f_is_func]
+        · zdom
         · exact pair_f
     · exact ha
   · intro y hy
@@ -1335,19 +1378,19 @@ theorem eq_singleton_of_bijective_inv_Image_of_singleton {A B : ZFSet} {f : ZFSe
 
 theorem Image_singleton_eq_fapply {A B : ZFSet} {f : ZFSet}
   (hf : A.IsFunc B f) {a : ZFSet} (ha : a ∈ A) :
-    f[{a}] = { (@ᶻf ⟨a, by rwa [is_func_dom_eq hf]⟩).val } := by
+    f[{a}] = { (@ᶻf ⟨a, by zdom⟩).val } := by
   rw [←Image_of_singleton_pair_mem_iff hf]
   apply fapply.def
 
 theorem fapply_eq_Image_singleton {A B : ZFSet} {f : ZFSet}
   (hf : A.IsFunc B f) {a : ZFSet} (ha : a ∈ A) :
-    @ᶻf ⟨a, by rwa [is_func_dom_eq hf]⟩ = ⋂₀ (f[{a}]) := by
+    @ᶻf ⟨a, by zdom⟩ = ⋂₀ (f[{a}]) := by
   rw [Image_singleton_eq_fapply hf ha, sInter_singleton]
 
 theorem fapply_composition {g f : ZFSet} {A B C : ZFSet}
   (hg : B.IsFunc C g) (hf : A.IsFunc B f) {x : ZFSet} (xA : x ∈ A) :
-  @ᶻ(g ∘ᶻ f) ⟨x, by rwa [is_func_dom_eq]⟩ =
-    @ᶻg ⟨@ᶻf ⟨x, by rwa [is_func_dom_eq]⟩,
+  @ᶻ(g ∘ᶻ f) ⟨x, by zdom⟩ =
+    @ᶻg ⟨@ᶻf ⟨x, by zdom⟩,
       by rw [is_func_dom_eq]; apply fapply_mem_range⟩ := by
   unfold fcomp
   rw [Subtype.ext_iff]
@@ -1397,7 +1440,7 @@ theorem Image_of_composition_inv_self_of_bijective {f A B : ZFSet} {f_is_func : 
     rw [mem_Image]
     and_intros
     · exact hX hx
-    · use @ᶻf ⟨x, by rw [is_func_dom_eq f_is_func]; exact hX hx⟩
+    · use @ᶻf ⟨x, by zdom⟩
       and_intros
       · rw [mem_Image]
         and_intros
@@ -1419,7 +1462,7 @@ theorem Image_of_composition_self_inv_of_bijective {f A B : ZFSet} {f_is_func : 
 
 theorem fapply_inv_of_bijective {A B : ZFSet} {f : ZFSet} {hf : IsFunc A B f}
   (f_bij : f.IsBijective hf) {x y : ZFSet} (hx : x ∈ A) (hy : y ∈ B) :
-    @ᶻf ⟨x, by rwa [is_func_dom_eq]⟩ = y → @ᶻf⁻¹ ⟨y, by rwa [is_func_dom_eq]⟩ = x := by
+    @ᶻf ⟨x, by zdom⟩ = y → @ᶻf⁻¹ ⟨y, by zdom⟩ = x := by
   intro rfl
   conv_lhs =>
     rw [←fapply_composition (inv_is_func_of_bijective f_bij) hf hx,
@@ -1433,7 +1476,7 @@ theorem fapply_inv_of_bijective {A B : ZFSet} {f : ZFSet} {hf : IsFunc A B f}
 
 theorem fapply_inv_of_bijective_iff {A B : ZFSet} {f : ZFSet} {hf : IsFunc A B f}
   (f_bij : f.IsBijective hf) {x y : ZFSet} (hx : x ∈ A) (hy : y ∈ B) :
-    @ᶻf ⟨x, by rwa [is_func_dom_eq]⟩ = y ↔ @ᶻf⁻¹ ⟨y, by rwa [is_func_dom_eq]⟩ = x
+    @ᶻf ⟨x, by zdom⟩ = y ↔ @ᶻf⁻¹ ⟨y, by zdom⟩ = x
   where
     mp := fapply_inv_of_bijective f_bij hx hy
     mpr := by
@@ -1715,8 +1758,10 @@ theorem IsFunc.range_eq_of_surjective {f A B : ZFSet} (hf : IsFunc A B f)
       · exact ZFSet.mem_dom (is_func_is_pfunc hf) xy
       · exact xy
 
-attribute [-instance] ZFSet.instPartialOrder
-
+-- `ZFSet.instPartialOrder` induces a subset-based order on `{x // x ∈ n}`, which would clash
+-- with the numeric order below. Since Mathlib derives `⊆` on `ZFSet` from that instance, the
+-- removal is scoped to this declaration only.
+attribute [-instance] ZFSet.instPartialOrder in
 @[reducible]
 def instPreorder_mem_Nat {n : ZFSet} (hn : n ∈ Nat) : Preorder {x // x ∈ n} where
   le := fun ⟨a, ha⟩ ⟨b, hb⟩ ↦
@@ -2583,8 +2628,8 @@ theorem fprod_is_func {A B A' B' φ ψ : ZFSet} (hφ : A.IsFunc A' φ) (hψ : B.
     obtain ⟨a', b', a, b, rfl, ⟨aA, bB⟩, ⟨a'A', b'B'⟩, eq⟩ := hz
     rw [dite_cond_eq_true (eq_true (by rw [pair_mem_prod]; exact ⟨aA, bB⟩)), pair_inj] at eq
     obtain ⟨rfl, rfl⟩ := eq
-    let φa : ZFSet := @ᶻφ ⟨a, by rwa [is_func_dom_eq hφ]⟩
-    let ψb : ZFSet := @ᶻψ ⟨b, by rwa [is_func_dom_eq hψ]⟩
+    let φa : ZFSet := @ᶻφ ⟨a, by zdom⟩
+    let ψb : ZFSet := @ᶻψ ⟨b, by zdom⟩
     simp only [mem_prod, pair_inj, exists_eq_right_right', π₁_pair, π₂_pair]
     and_intros
     · exact aA
@@ -2594,8 +2639,8 @@ theorem fprod_is_func {A B A' B' φ ψ : ZFSet} (hφ : A.IsFunc A' φ) (hψ : B.
   · intro z hz
     rw [mem_prod] at hz
     obtain ⟨a, ha, b, hb, rfl⟩ := hz
-    let φa : ZFSet := @ᶻφ ⟨a, by rwa [is_func_dom_eq hφ]⟩
-    let ψb : ZFSet := @ᶻψ ⟨b, by rwa [is_func_dom_eq hψ]⟩
+    let φa : ZFSet := @ᶻφ ⟨a, by zdom⟩
+    let ψb : ZFSet := @ᶻψ ⟨b, by zdom⟩
     use φa.pair ψb
     and_intros <;> beta_reduce
     · simp_rw [fprod, lambda_spec, pair_mem_prod]
@@ -2640,9 +2685,9 @@ theorem fprod_bijective_of_bijective {A B A' B' φ ψ : ZFSet}
     rw [mem_prod] at hy
     obtain ⟨a', ha', b', hb', rfl⟩ := hy
     let φ_inv_a' : ZFSet := fapply φ⁻¹ (is_func_is_pfunc <| inv_is_func_of_bijective φ_bij)
-      ⟨a', by rwa [is_func_dom_eq (inv_is_func_of_bijective φ_bij)]⟩
+      ⟨a', by zdom⟩
     let ψ_inv_b' : ZFSet := fapply ψ⁻¹ (is_func_is_pfunc <| inv_is_func_of_bijective ψ_bij)
-      ⟨b', by rwa [is_func_dom_eq (inv_is_func_of_bijective ψ_bij)]⟩
+      ⟨b', by zdom⟩
     use φ_inv_a'.pair ψ_inv_b'
     and_intros
     · rw [pair_mem_prod]
@@ -2678,8 +2723,8 @@ theorem fprod_bijective_of_bijective {A B A' B' φ ψ : ZFSet}
 
 theorem mem_fprod {A B C D f g x : ZFSet} {hf : A.IsFunc C f} {hg : B.IsFunc D g} :
   x ∈ fprod f g ↔ ∃ (a b : ZFSet) (ha : a ∈ A) (hb : b ∈ B),
-    let fa : ZFSet := @ᶻf ⟨a, by rwa [is_func_dom_eq hf]⟩
-    let gb : ZFSet := @ᶻg ⟨b, by rwa [is_func_dom_eq hg]⟩
+    let fa : ZFSet := @ᶻf ⟨a, by zdom⟩
+    let gb : ZFSet := @ᶻg ⟨b, by zdom⟩
     x = (a.pair b).pair (fa.pair gb) where
   mp := by
     intro hx
@@ -2706,8 +2751,8 @@ theorem mem_fprod {A B C D f g x : ZFSet} {hf : A.IsFunc C f} {hg : B.IsFunc D g
 
 theorem pair_mem_fprod {A B C D f g x y : ZFSet} {hf : A.IsFunc C f} {hg : B.IsFunc D g} :
   x.pair y ∈ fprod f g ↔ ∃ (a b : ZFSet) (ha : a ∈ A) (hb : b ∈ B),
-    let fa : ZFSet := @ᶻf ⟨a, by rwa [is_func_dom_eq hf]⟩
-    let gb : ZFSet := @ᶻg ⟨b, by rwa [is_func_dom_eq hg]⟩
+    let fa : ZFSet := @ᶻf ⟨a, by zdom⟩
+    let gb : ZFSet := @ᶻg ⟨b, by zdom⟩
     x = a.pair b ∧ y = fa.pair gb := by
   rw [mem_fprod]
   simp only [pair_inj, exists_and_left]
@@ -2717,8 +2762,8 @@ theorem fapply_fprod {A B C D f g a b : ZFSet} (hf : A.IsFunc C f) (hg : B.IsFun
   (ha : a ∈ A) (hb : b ∈ B) :
     @ᶻ(fprod f g)
       ⟨a.pair b, by rw [is_func_dom_eq (fprod_is_func hf hg), pair_mem_prod]; exact ⟨ha, hb⟩⟩ =
-    let fa : ZFSet := @ᶻf ⟨a, by rwa [is_func_dom_eq hf]⟩
-    let gb : ZFSet := @ᶻg ⟨b, by rwa [is_func_dom_eq hg]⟩
+    let fa : ZFSet := @ᶻf ⟨a, by zdom⟩
+    let gb : ZFSet := @ᶻg ⟨b, by zdom⟩
     fa.pair gb := by
   conv =>
     enter [1]
@@ -2760,8 +2805,8 @@ theorem composition_fprod_Image_bijective {A B A' B' φ ψ : ZFSet}
       ext1 z
       constructor <;> intro hz
       · obtain ⟨a, ha, b, hb, rfl⟩ := ‹x ⊆ A.prod B› hz |> mem_prod.mp
-        letI φa : ZFSet := @ᶻφ ⟨a, by rwa [is_func_dom_eq hφ]⟩
-        letI ψb : ZFSet := @ᶻψ ⟨b, by rwa [is_func_dom_eq hψ]⟩
+        letI φa : ZFSet := @ᶻφ ⟨a, by zdom⟩
+        letI ψb : ZFSet := @ᶻψ ⟨b, by zdom⟩
         specialize eq (φa.pair ψb) φa (fapply_mem_range _ _) ψb (fapply_mem_range _ _) rfl
         have := eq.mp ⟨a.pair b, hz, ?_⟩
         · obtain ⟨p, hp, p_def⟩ := this
@@ -2777,8 +2822,8 @@ theorem composition_fprod_Image_bijective {A B A' B' φ ψ : ZFSet}
           · use ha
           · use hb
       · obtain ⟨a, ha, b, hb, rfl⟩ := ‹y ⊆ A.prod B› hz |> mem_prod.mp
-        letI φa : ZFSet := @ᶻφ ⟨a, by rwa [is_func_dom_eq hφ]⟩
-        letI ψb : ZFSet := @ᶻψ ⟨b, by rwa [is_func_dom_eq hψ]⟩
+        letI φa : ZFSet := @ᶻφ ⟨a, by zdom⟩
+        letI ψb : ZFSet := @ᶻψ ⟨b, by zdom⟩
         specialize eq (φa.pair ψb) φa (fapply_mem_range _ _) ψb (fapply_mem_range _ _) rfl
         have := eq.mpr ⟨a.pair b, hz, ?_⟩
         · obtain ⟨p, hp, p_def⟩ := this

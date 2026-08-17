@@ -203,6 +203,41 @@ theorem succ_mem_Nat' {n} (h : n ∈ Nat) : insert n n ∈ Nat := by
   · exact some_inf_powerset_sep_inductive_nonempty
 
 /--
+`Nat` is the least inductive set: it is contained in *every* inductive set, with no
+restriction to subsets of `some_inf`.
+
+This is the unrestricted form of `inductive_subset_some_inf_contains_Nat`; the extra
+hypothesis `a ⊆ some_inf` is eliminated by intersecting `a` with `some_inf` first.
+-/
+theorem Nat_subset_of_inductive {a : ZFSet} (h : inductive_set a) : Nat ⊆ a := by
+  have hb : inductive_set (some_inf.sep (· ∈ a)) :=
+    inductive_sep _ inductive_some_inf h.left fun n _ hn => h.right n hn
+  intro n hn
+  exact mem_sep.mp (inductive_subset_some_inf_contains_Nat hb sep_subset_self hn) |>.right
+
+/--
+The definition of `Nat` is independent of the witness granted by the axiom of infinity:
+intersecting the inductive subsets of *any* inductive set `T` yields the same set `Nat`.
+
+In particular `Nat = ⋂₀ ((powerset ω).sep inductive_set)`, so seeding the construction with
+`some_inf` rather than `ω` is a choice without observable consequence.
+-/
+theorem Nat_eq_of_inductive {T : ZFSet} (hT : inductive_set T) :
+    Nat = ⋂₀ ((powerset T).sep inductive_set) := by
+  have Nat_ind : inductive_set Nat := ⟨zero_in_Nat, fun _ _ => succ_mem_Nat' ‹_›⟩
+  have hne : ((powerset T).sep inductive_set).Nonempty :=
+    ⟨T, mem_sep.mpr ⟨mem_powerset.mpr fun _ => id, hT⟩⟩
+  ext n
+  constructor
+  · intro hn
+    rw [mem_sInter hne]
+    intro y hy
+    exact Nat_subset_of_inductive (mem_sep.mp hy).right hn
+  · intro hn
+    rw [mem_sInter hne] at hn
+    exact hn Nat <| mem_sep.mpr ⟨mem_powerset.mpr (Nat_subset_of_inductive hT), Nat_ind⟩
+
+/--
 The successor function `succ` is build from the insertion of a set into itself embedded into the
 `ZFNat` type.
 -/
@@ -319,7 +354,7 @@ lemma ind {P : ZFSet → Prop} (n : ZFSet)
 theorem induction {P : ZFNat → Prop} (n : ZFNat)
   (zero : P 0) (succ : ∀ n, P n → P (succ n)) : P n := by classical
   let ⟨n, hn⟩ := n
-  let P' x := if hx : x ∈ Nat then P ⟨x, hx⟩ else unreachable!
+  let P' x := if hx : x ∈ Nat then P ⟨x, hx⟩ else PUnit
   have : P' n = P ⟨n, hn⟩ := dif_pos hn
   rw [← this]
   apply @ind P' n hn
@@ -644,7 +679,7 @@ definitions over natural numbers to be defined in a more natural way.
 def rec.{u} {motive : ZFNat → Sort u} (n : ZFNat)
   (zero : motive 0) (succ : Π x, motive x → motive (succ x)) : motive n := by classical
   let ⟨n, hn⟩ := n
-  let motive' (x : ZFSet) := if hx : x ∈ Nat then motive ⟨x, hx⟩ else unreachable!
+  let motive' (x : ZFSet) := if hx : x ∈ Nat then motive ⟨x, hx⟩ else PUnit
   have : motive' n = motive ⟨n, hn⟩ := dif_pos hn
   rw [← this]
   apply @ZFNat.rec' motive' n hn
@@ -671,6 +706,22 @@ theorem rec_succ.{u} {motive : ZFNat → Sort u} (n : ZFNat)
   (zero : motive 0) (succ' : Π x, motive x → motive (succ x)) :
   rec (succ n) zero succ' = succ' n (ZFNat.rec n zero succ') := by
     simp [ZFNat.rec, succ, ZFNat.rec'_succ _ n.property]
+    exact eq_of_heq (HEq.trans (cast_heq _ _) (cast_heq _ _))
+
+/--
+Uniqueness half of the universal property of `ZFNat`: `ZFNat.rec` is the *only* family
+satisfying the two computation rules `rec_zero` and `rec_succ`.
+
+Together with `rec_zero`/`rec_succ` this says that `(ZFNat, 0, succ)` is initial among
+sets equipped with a point and an endomorphism.
+-/
+theorem rec_unique.{u} {motive : ZFNat → Sort u} (zero : motive 0)
+  (succ' : Π x, motive x → motive (succ x)) (f : Π x, motive x)
+  (h₀ : f 0 = zero) (hs : ∀ x, f (succ x) = succ' x (f x)) (n : ZFNat) :
+    f n = ZFNat.rec n zero succ' := by
+  induction n using ZFNat.rec with
+  | zero => rw [h₀, rec_zero]
+  | succ n ih => rw [hs, rec_succ, ih]
 
 end Recursion
 
@@ -1448,6 +1499,13 @@ instance : Semiring ZFNat where
 
 instance : CommSemiring ZFNat where
   mul_comm := mul_comm
+
+/--
+The `CommSemiring` instance makes Mathlib's `ring` normalisation available on `ZFNat`.
+Here `^` is the monoid power with exponent in `ℕ`, while the coefficient `2` is the
+`ZFNat` numeral obtained from `Nat.cast`.
+-/
+example (a b : ZFNat) : (a+b)^2 = a^2 + 2*a*b + b^2 := by ring
 
 instance : Std.Associative (α := ZFNat) (· + ·) := ⟨(ZFNat.add_assoc · · · |>.symm)⟩
 instance : Std.Commutative (α := ZFNat) (· + ·) := ⟨ZFNat.add_comm⟩

@@ -978,13 +978,6 @@ noncomputable instance : CommRing ZFInt where
   zsmul_succ' x y := add_comm y (nsmul x y)
   neg_add_cancel := @add_left_neg
 
-instance : PartialOrder ZFInt where
-  le := int_le.le
-  le_refl := le_refl
-  le_trans := @le_trans
-  le_antisymm := @le_antisymm
-  lt_iff_le_not_ge := @lt_iff_le_not_ge
-
 instance : IsOrderedRing ZFInt where
   add_le_add_left _ _ h z := add_le_add_left h z
   zero_le_one := Or.inl zero_lt_one

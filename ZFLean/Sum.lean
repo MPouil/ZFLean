@@ -168,6 +168,18 @@ theorem casesOn_of_inr {A B : ZFSet} {motive : A ⊎ B → Sort*} (a : {x // x �
   · rw [inr, π₁_pair]
     exact zftrue_ne_zffalse
 
+/--
+Uniqueness half of the universal property of the disjoint sum: `casesOn` is the *only*
+family agreeing with `inl_case` along `inl` and with `inr_case` along `inr`.
+-/
+theorem casesOn_unique {A B : ZFSet} {motive : A ⊎ B → Sort*}
+  (inl_case : Π a, motive (inl a)) (inr_case : Π b, motive (inr b)) (g : Π x, motive x)
+  (hinl : ∀ a, g (inl a) = inl_case a) (hinr : ∀ b, g (inr b) = inr_case b) (x : A ⊎ B) :
+    g x = casesOn x inl_case inr_case := by
+  cases x with
+  | inl a => rw [hinl, casesOn_of_inl]
+  | inr b => rw [hinr, casesOn_of_inr]
+
 noncomputable def equivSum {A B : ZFSet} : A ⊎ B ≃ ({x // x ∈ A} ⊕ {x // x ∈ B}) where
   toFun x := by
     cases x with
@@ -192,8 +204,232 @@ noncomputable def equivSum {A B : ZFSet} : A ⊎ B ≃ ({x // x ∈ A} ⊕ {x //
     | inl a => simp only [casesOn_of_inl]
     | inr b => simp only [casesOn_of_inr]
 
+/-! ### Set-level universal property of the coproduct
+
+Everything above states the disjoint sum at the *type* level: `A ⊎ B` is a Lean subtype and
+`casesOn` eliminates into a Lean family. This section states the same universal property
+*inside the model*: the objects are `ZFSet`s, the arrows are elements of `funs`, and
+composition is `ZFSet.composition`. -/
+
+/-- The underlying `ZFSet` carrier of the disjoint sum: `A ⊎ B` is `{x // x ∈ toZFSet A B}`. -/
+def toZFSet (A B : ZFSet) : ZFSet :=
+  (ZFSet.prod { ZFBool.false.val } A) ∪ (ZFSet.prod { ZFBool.true.val } B)
+
+theorem sum_eq_subtype_toZFSet {A B : ZFSet} : (A ⊎ B) = {x // x ∈ toZFSet A B} := rfl
+
+theorem pair_false_mem_toZFSet {A B a : ZFSet} (ha : a ∈ A) :
+    ZFSet.pair ZFBool.false.val a ∈ toZFSet A B :=
+  mem_union.mpr <| Or.inl <| pair_mem_prod.mpr ⟨mem_singleton.mpr rfl, ha⟩
+
+theorem pair_true_mem_toZFSet {A B b : ZFSet} (hb : b ∈ B) :
+    ZFSet.pair ZFBool.true.val b ∈ toZFSet A B :=
+  mem_union.mpr <| Or.inr <| pair_mem_prod.mpr ⟨mem_singleton.mpr rfl, hb⟩
+
+/-- An element of `toZFSet A B` tagged by `false` has its second projection in `A`. -/
+theorem mem_left_of_toZFSet {A B z : ZFSet} (hz : z ∈ toZFSet A B)
+    (h : z.π₁ = ZFBool.false.val) : z.π₂ ∈ A := by
+  rw [toZFSet, mem_union] at hz
+  rcases hz with hz | hz
+  · exact (pair_mem_prod.mp (pair_eta hz ▸ hz)).2
+  · rw [pair_eta hz, pair_mem_prod, mem_singleton] at hz
+    rw [hz.1] at h
+    nomatch zftrue_ne_zffalse h
+
+/-- An element of `toZFSet A B` not tagged by `false` has its second projection in `B`. -/
+theorem mem_right_of_toZFSet {A B z : ZFSet} (hz : z ∈ toZFSet A B)
+    (h : z.π₁ ≠ ZFBool.false.val) : z.π₂ ∈ B := by
+  rw [toZFSet, mem_union] at hz
+  rcases hz with hz | hz
+  · rw [pair_eta hz, pair_mem_prod, mem_singleton] at hz
+    exact absurd hz.1 h
+  · exact (pair_mem_prod.mp (pair_eta hz ▸ hz)).2
+
+/-- The left injection `A → A ⊎ B`, as a set-level function. -/
+noncomputable def inlFun (A B : ZFSet) : ZFSet :=
+  λᶻ : A → toZFSet A B | a ↦ ZFSet.pair ZFBool.false.val a
+
+/-- The right injection `B → A ⊎ B`, as a set-level function. -/
+noncomputable def inrFun (A B : ZFSet) : ZFSet :=
+  λᶻ : B → toZFSet A B | b ↦ ZFSet.pair ZFBool.true.val b
+
+@[zfun]
+theorem inlFun_is_func {A B : ZFSet} : IsFunc A (toZFSet A B) (inlFun A B) :=
+  lambda_isFunc fun ha => pair_false_mem_toZFSet ha
+
+@[zfun]
+theorem inrFun_is_func {A B : ZFSet} : IsFunc B (toZFSet A B) (inrFun A B) :=
+  lambda_isFunc fun hb => pair_true_mem_toZFSet hb
+
+open Classical in
+/--
+The mediating map `[f, g] : A ⊎ B → X` of the coproduct: it applies `f` to the elements
+tagged by `false` and `g` to those tagged by `true`.
+-/
+noncomputable def coprod {A B X : ZFSet} (f g : ZFSet)
+  (hf : IsFunc A X f := by zfun) (hg : IsFunc B X g := by zfun) : ZFSet :=
+  λᶻ : toZFSet A B → X
+     |       z     ↦ if hz : z ∈ toZFSet A B then
+                       if h : z.π₁ = ZFBool.false.val then
+                         (@ᶻf ⟨z.π₂, by
+                           rw [is_func_dom_eq hf]; exact mem_left_of_toZFSet hz h⟩).val
+                       else
+                         (@ᶻg ⟨z.π₂, by
+                           rw [is_func_dom_eq hg]; exact mem_right_of_toZFSet hz h⟩).val
+                     else ∅
+
+@[zfun]
+theorem coprod_is_func {A B X f g : ZFSet} (hf : IsFunc A X f) (hg : IsFunc B X g) :
+    IsFunc (toZFSet A B) X (coprod f g hf hg) := by
+  apply lambda_isFunc
+  intro z hz
+  rw [dite_cond_eq_true (eq_true hz)]
+  split_ifs <;> apply SetLike.coe_mem
+
+/--
+`[f, g]` as a partial function, so that `fapply` can be applied to it without re-running the
+`zpfun` search on the (large) body of `coprod`.
+-/
+theorem coprod_is_pfunc {A B X f g : ZFSet} (hf : IsFunc A X f) (hg : IsFunc B X g) :
+    (coprod f g hf hg).IsPFunc (toZFSet A B) X := is_func_is_pfunc (coprod_is_func hf hg)
+
+/-- `[f, g]` computes with `f` on the left summand. -/
+theorem coprod_of_inl {A B X f g : ZFSet} (hf : IsFunc A X f) (hg : IsFunc B X g)
+    {a : ZFSet} (ha : a ∈ A) :
+    fapply (coprod f g hf hg) (coprod_is_pfunc hf hg)
+        ⟨ZFSet.pair ZFBool.false.val a, by
+          rw [is_func_dom_eq (coprod_is_func hf hg)]; exact pair_false_mem_toZFSet ha⟩
+      = @ᶻf ⟨a, by rwa [is_func_dom_eq hf]⟩ := by
+  have key : (ZFSet.pair ZFBool.false.val a).pair
+      (@ᶻf ⟨a, by rwa [is_func_dom_eq hf]⟩ : {x // x ∈ X}).val ∈ coprod f g hf hg := by
+    rw [coprod, lambda_spec]
+    refine ⟨pair_false_mem_toZFSet ha, Subtype.property _, ?_⟩
+    rw [dite_cond_eq_true (eq_true (pair_false_mem_toZFSet ha)),
+      dite_cond_eq_true (eq_true (π₁_pair ..))]
+    simp only [π₂_pair]
+  rw [fapply.of_pair (coprod_is_pfunc hf hg) key]
+
+/-- `[f, g]` computes with `g` on the right summand. -/
+theorem coprod_of_inr {A B X f g : ZFSet} (hf : IsFunc A X f) (hg : IsFunc B X g)
+    {b : ZFSet} (hb : b ∈ B) :
+    fapply (coprod f g hf hg) (coprod_is_pfunc hf hg)
+        ⟨ZFSet.pair ZFBool.true.val b, by
+          rw [is_func_dom_eq (coprod_is_func hf hg)]; exact pair_true_mem_toZFSet hb⟩
+      = @ᶻg ⟨b, by rwa [is_func_dom_eq hg]⟩ := by
+  have key : (ZFSet.pair ZFBool.true.val b).pair
+      (@ᶻg ⟨b, by rwa [is_func_dom_eq hg]⟩ : {x // x ∈ X}).val ∈ coprod f g hf hg := by
+    rw [coprod, lambda_spec]
+    refine ⟨pair_true_mem_toZFSet hb, Subtype.property _, ?_⟩
+    rw [dite_cond_eq_true (eq_true (pair_true_mem_toZFSet hb)),
+      dite_cond_eq_false (eq_false ?_)]
+    · simp only [π₂_pair]
+    · rw [π₁_pair]
+      exact zftrue_ne_zffalse
+  rw [fapply.of_pair (coprod_is_pfunc hf hg) key]
+
+theorem fapply_inlFun {A B x : ZFSet} (hx : x ∈ A) :
+    fapply (inlFun A B) (is_func_is_pfunc inlFun_is_func)
+        ⟨x, by rw [is_func_dom_eq (inlFun_is_func (A := A) (B := B))]; exact hx⟩
+      = ⟨ZFSet.pair ZFBool.false.val x, pair_false_mem_toZFSet hx⟩ := by
+  have key : x.pair (ZFSet.pair ZFBool.false.val x) ∈ inlFun A B := by
+    rw [inlFun, lambda_spec]
+    exact ⟨hx, pair_false_mem_toZFSet hx, rfl⟩
+  rw [fapply.of_pair (is_func_is_pfunc inlFun_is_func) key]
+
+theorem coprod_comp_inl {A B X f g : ZFSet} (hf : IsFunc A X f) (hg : IsFunc B X g) :
+    fcomp (coprod f g hf hg) (inlFun A B) (coprod_is_func hf hg) inlFun_is_func = f := by
+  rw [is_func_ext_iff (IsFunc_of_composition_IsFunc (coprod_is_func hf hg) inlFun_is_func) hf]
+  intro x hx
+  rw [fapply_composition (coprod_is_func hf hg) inlFun_is_func hx]
+  have hval : (fapply (inlFun A B) (is_func_is_pfunc inlFun_is_func)
+      ⟨x, by rw [is_func_dom_eq (inlFun_is_func (A := A) (B := B))]; exact hx⟩).val
+      = ZFSet.pair ZFBool.false.val x := congrArg Subtype.val (fapply_inlFun hx)
+  simp only [hval]
+  exact coprod_of_inl hf hg hx
+
+theorem fapply_inrFun {A B x : ZFSet} (hx : x ∈ B) :
+    fapply (inrFun A B) (is_func_is_pfunc inrFun_is_func)
+        ⟨x, by rw [is_func_dom_eq (inrFun_is_func (A := A) (B := B))]; exact hx⟩
+      = ⟨ZFSet.pair ZFBool.true.val x, pair_true_mem_toZFSet hx⟩ := by
+  have key : x.pair (ZFSet.pair ZFBool.true.val x) ∈ inrFun A B := by
+    rw [inrFun, lambda_spec]
+    exact ⟨hx, pair_true_mem_toZFSet hx, rfl⟩
+  rw [fapply.of_pair (is_func_is_pfunc inrFun_is_func) key]
+
+theorem eta_of_toZFSet {A B z : ZFSet} (hz : z ∈ toZFSet A B) : z = z.π₁.pair z.π₂ := by
+  rw [toZFSet, mem_union] at hz
+  rcases hz with hz | hz <;> exact pair_eta hz
+
+theorem exists_repr_of_toZFSet {A B z : ZFSet} (hz : z ∈ toZFSet A B) :
+    (∃ a ∈ A, z = ZFSet.pair ZFBool.false.val a) ∨ (∃ b ∈ B, z = ZFSet.pair ZFBool.true.val b) := by
+  by_cases h : z.π₁ = ZFBool.false.val
+  · exact Or.inl ⟨z.π₂, mem_left_of_toZFSet hz h, by conv_lhs => rw [eta_of_toZFSet hz, h]⟩
+  · refine Or.inr ⟨z.π₂, mem_right_of_toZFSet hz h, ?_⟩
+    have h1 : z.π₁ = ZFBool.true.val := by
+      rw [toZFSet, mem_union] at hz
+      rcases hz with hz | hz
+      · rw [pair_eta hz, pair_mem_prod, mem_singleton] at hz
+        exact absurd hz.1 h
+      · rw [pair_eta hz, pair_mem_prod, mem_singleton] at hz
+        exact hz.1
+    conv_lhs => rw [eta_of_toZFSet hz, h1]
+
+theorem coprod_comp_inr {A B X f g : ZFSet} (hf : IsFunc A X f) (hg : IsFunc B X g) :
+    fcomp (coprod f g hf hg) (inrFun A B) (coprod_is_func hf hg) inrFun_is_func = g := by
+  rw [is_func_ext_iff (IsFunc_of_composition_IsFunc (coprod_is_func hf hg) inrFun_is_func) hg]
+  intro x hx
+  rw [fapply_composition (coprod_is_func hf hg) inrFun_is_func hx]
+  have hval : (fapply (inrFun A B) (is_func_is_pfunc inrFun_is_func)
+      ⟨x, by rw [is_func_dom_eq (inrFun_is_func (A := A) (B := B))]; exact hx⟩).val
+      = ZFSet.pair ZFBool.true.val x := congrArg Subtype.val (fapply_inrFun hx)
+  simp only [hval]
+  exact coprod_of_inr hf hg hx
+
+theorem coprod_unique {A B X f g m : ZFSet} (hf : IsFunc A X f) (hg : IsFunc B X g)
+    (hm : IsFunc (toZFSet A B) X m)
+    (hl : fcomp m (inlFun A B) hm inlFun_is_func = f)
+    (hr : fcomp m (inrFun A B) hm inrFun_is_func = g) :
+    m = coprod f g hf hg := by
+  subst hl
+  subst hr
+  rw [is_func_ext_iff hm (coprod_is_func hf hg)]
+  intro z hz
+  rcases exists_repr_of_toZFSet hz with ⟨a, ha, rfl⟩ | ⟨b, hb, rfl⟩
+  · rw [coprod_of_inl hf hg ha, fapply_composition hm inlFun_is_func ha]
+    have hval : (fapply (inlFun A B) (is_func_is_pfunc inlFun_is_func)
+        ⟨a, by rw [is_func_dom_eq (inlFun_is_func (A := A) (B := B))]; exact ha⟩).val
+        = ZFSet.pair ZFBool.false.val a := congrArg Subtype.val (fapply_inlFun ha)
+    simp only [hval]
+  · rw [coprod_of_inr hf hg hb, fapply_composition hm inrFun_is_func hb]
+    have hval : (fapply (inrFun A B) (is_func_is_pfunc inrFun_is_func)
+        ⟨b, by rw [is_func_dom_eq (inrFun_is_func (A := A) (B := B))]; exact hb⟩).val
+        = ZFSet.pair ZFBool.true.val b := congrArg Subtype.val (fapply_inrFun hb)
+    simp only [hval]
+
+/--
+**Set-level universal property of the coproduct.** For `f ∈ A.funs X` and `g ∈ B.funs X`
+there is a unique `m ∈ (toZFSet A B).funs X` whose restrictions along the two injections
+`inlFun`/`inrFun` are `f` and `g`. The mediating map is `coprod f g`.
+
+This is the statement of `Sum.casesOn` / `Sum.casesOn_unique` transported inside the model:
+objects are `ZFSet`s, arrows are elements of `funs`, composition is `ZFSet.composition`.
+-/
+theorem funs_coprod_universal {A B X f g : ZFSet}
+    (hf : f ∈ A.funs X) (hg : g ∈ B.funs X) :
+    ∃! m, m ∈ (toZFSet A B).funs X ∧
+      composition m (inlFun A B) A (toZFSet A B) X = f ∧
+      composition m (inrFun A B) B (toZFSet A B) X = g := by
+  refine ⟨coprod f g (mem_funs.mp hf) (mem_funs.mp hg), ⟨?_, ?_, ?_⟩, ?_⟩
+  · exact mem_funs.mpr (coprod_is_func (mem_funs.mp hf) (mem_funs.mp hg))
+  · exact coprod_comp_inl (mem_funs.mp hf) (mem_funs.mp hg)
+  · exact coprod_comp_inr (mem_funs.mp hf) (mem_funs.mp hg)
+  · rintro m ⟨hm, hml, hmr⟩
+    exact coprod_unique (mem_funs.mp hf) (mem_funs.mp hg) (mem_funs.mp hm) hml hmr
+
 end Sum
 
+/-- `Option S` is the disjoint sum `{∅} ⊎ S`. Marked reducible so that the two spellings
+stay interchangeable under `rw` and `simp`. -/
+@[reducible]
 def Option (S : ZFSet) := {∅} ⊎ S
 
 instance {T : ZFSet} : Nonempty (Option T) := ⟨Sum.inl ⟨∅, mem_singleton.mpr rfl⟩⟩
@@ -243,6 +479,49 @@ theorem casesOn {S : ZFSet} (x : Option S) : x = none ∨ (∃ y, x = some y) :=
     · rw [pair_mem_prod] at hx
       unfold some Sum.inr
       exists ⟨val, hx.right⟩
+
+/-- The left summand of `Option S` is a singleton: every `inl` is `none`. -/
+theorem inl_eq_none {S : ZFSet} (a : {x // x ∈ ({∅} : ZFSet)}) : (Sum.inl a : Option S) = none :=
+  congrArg Sum.inl (Subtype.ext (mem_singleton.mp a.2))
+
+/--
+Cases elimination for `Option`, the data-level counterpart of the disjunction
+`Option.casesOn`. It is `Sum.casesOn` on `{∅} ⊎ S`, using `inl_eq_none` to collapse the
+left summand.
+-/
+noncomputable def elim.{v} {S : ZFSet} {motive : Option S → Sort v} (x : Option S)
+  (none_case : motive none) (some_case : Π y, motive (some y)) : motive x := by
+  refine Sum.casesOn (motive := motive) x (fun a => ?_) some_case
+  rw [inl_eq_none a]
+  exact none_case
+
+/-- Computation rule of `elim` on `none`. -/
+@[simp]
+theorem elim_of_none {S : ZFSet} {motive : Option S → Sort*}
+  (none_case : motive none) (some_case : Π y, motive (some y)) :
+    elim none none_case some_case = none_case := by
+  rw [elim, Sum.casesOn_of_inl]
+  rfl
+
+/-- Computation rule of `elim` on `some`. -/
+@[simp]
+theorem elim_of_some {S : ZFSet} {motive : Option S → Sort*}
+  (none_case : motive none) (some_case : Π y, motive (some y)) (y : {x // x ∈ S}) :
+    elim (some y) none_case some_case = some_case y := by
+  rw [elim, Sum.casesOn_of_inr]
+
+/--
+Uniqueness half of the universal property of `Option`: `elim` is the *only* family
+agreeing with `none_case` on `none` and with `some_case` along `some`.
+-/
+theorem elim_unique {S : ZFSet} {motive : Option S → Sort*}
+  (none_case : motive none) (some_case : Π y, motive (some y)) (g : Π x, motive x)
+  (hnone : g none = none_case) (hsome : ∀ y, g (some y) = some_case y) (x : Option S) :
+    g x = elim x none_case some_case := by
+  refine Sum.casesOn (motive := fun x => g x = elim x none_case some_case) x (fun a => ?_) ?_
+  · rw [inl_eq_none a, hnone, elim_of_none]
+  · intro y
+    rw [hsome, elim_of_some]
 
 -- theorem ZFInt.into.injective : Function.Injective into := into_inj
 -- theorem ZFInt.outof.injective : Function.Injective outof := outof_inj
@@ -389,7 +668,7 @@ noncomputable def flift {A B : ZFSet} (f : ZFSet)
       |          x       ↦ if hx : x ∈ Option.toZFSet A then
                               if isSome : ∃ y, ⟨x, hx⟩ = some y then
                                 let ⟨y, hy⟩ := Classical.choose isSome
-                                some (S := B) (@ᶻf ⟨y, by rwa [ZFSet.is_func_dom_eq]⟩) |>.val
+                                some (S := B) (@ᶻf ⟨y, by zdom⟩) |>.val
                               else none (S := B).val
                             else ∅
   have hf' : IsFunc (Option.toZFSet A) (Option.toZFSet B) f' := by
@@ -408,18 +687,26 @@ theorem flift_bijective {f A B : ZFSet} (hf : IsFunc A B f) :
       specialize hinj (Option.some ⟨x, hx⟩).val (Option.some ⟨y, hy⟩).val (Option.some ⟨z, hz⟩).val
         (SetLike.coe_mem _) (SetLike.coe_mem _) (SetLike.coe_mem _) ?_ ?_
       · rw [flift, lambda_spec]
-        simp only [SetLike.coe_mem, ↓reduceDIte, Subtype.coe_eta, some.injEq, exists_eq',
-          Classical.choose_eq', SetLike.coe_eq_coe, true_and]
-        rw [Option.some.injEq]
-        symm
-        exact fapply.of_pair _ xz
+        refine ⟨SetLike.coe_mem _, SetLike.coe_mem _, ?_⟩
+        split_ifs with h1 h2
+        · have hc : Classical.choose h2 = ⟨x, hx⟩ :=
+            Option.some.injEq.mp (Classical.choose_spec h2).symm
+          simp only [hc]
+          exact Subtype.ext_iff.mp <|
+            congrArg (Option.some (S := B)) (fapply.of_pair _ xz).symm
+        · exact absurd ⟨⟨x, hx⟩, rfl⟩ h2
+        · exact absurd (SetLike.coe_mem _) h1
       · rw [flift, lambda_spec]
-        simp only [SetLike.coe_mem, ↓reduceDIte, Subtype.coe_eta, some.injEq, exists_eq',
-          Classical.choose_eq', SetLike.coe_eq_coe, true_and]
-        rw [Option.some.injEq]
-        symm
-        exact fapply.of_pair _ yz
-      · rwa [←Subtype.ext_iff, Option.some.injEq, Subtype.ext_iff] at hinj
+        refine ⟨SetLike.coe_mem _, SetLike.coe_mem _, ?_⟩
+        split_ifs with h1 h2
+        · have hc : Classical.choose h2 = ⟨y, hy⟩ :=
+            Option.some.injEq.mp (Classical.choose_spec h2).symm
+          simp only [hc]
+          exact Subtype.ext_iff.mp <|
+            congrArg (Option.some (S := B)) (fapply.of_pair _ yz).symm
+        · exact absurd ⟨⟨y, hy⟩, rfl⟩ h2
+        · exact absurd (SetLike.coe_mem _) h1
+      · exact Subtype.ext_iff.mp <| Option.some.injEq.mp <| Subtype.ext_iff.mpr hinj
     · intro y hy
       have : (Option.some ⟨y, hy⟩).val ∈ Option.toZFSet B :=
         SetLike.coe_mem _
@@ -427,77 +714,72 @@ theorem flift_bijective {f A B : ZFSet} (hf : IsFunc A B f) :
       rw [flift, lambda_spec, dite_cond_eq_true (eq_true hx)] at xy
       obtain ⟨-, -, eq⟩ := xy
       split_ifs at eq with issome
-      · rw [←Subtype.ext_iff, Option.some.injEq, Subtype.ext_iff] at eq
-        obtain rfl := eq
+      · obtain rfl := Subtype.ext_iff.mp <| Option.some.injEq.mp <| Subtype.ext_iff.mpr eq
         use (Classical.choose issome).val
         and_intros
         · apply SetLike.coe_mem
         · apply fapply.def
-      · rw [←Subtype.ext_iff] at eq
-        nomatch ZFSet.Option.some_ne_none _ eq
+      · nomatch ZFSet.Option.some_ne_none _ (Subtype.val_inj.mp eq)
   mpr := by
     intro hbij
     rw [bijective_exists1_iff] at hbij ⊢
     intro y hy
     obtain eq | ⟨⟨y, hy⟩, eq⟩ := Option.casesOn ⟨y, hy⟩ <;>
-      (rw [Subtype.ext_iff] at eq; obtain rfl := eq)
+      obtain rfl := Subtype.ext_iff.mp eq
     · use (@none A).val
       and_intros
       · apply SetLike.coe_mem
-      · rw [flift, lambda_spec, dite_cond_eq_true (eq_true (SetLike.coe_mem _))]
-        and_intros
-        · apply SetLike.coe_mem
-        · apply SetLike.coe_mem
-        · split_ifs with isnone
-          · obtain ⟨_, contr⟩ := isnone
-            change none = some _ at contr
-            nomatch ZFSet.Option.some_ne_none _ contr.symm
-          · rfl
+      · rw [flift, lambda_spec]
+        refine ⟨SetLike.coe_mem _, SetLike.coe_mem _, ?_⟩
+        split_ifs with h1 isnone
+        · obtain ⟨_, contr⟩ := isnone
+          change none = some _ at contr
+          nomatch ZFSet.Option.some_ne_none _ contr.symm
+        · rfl
+        · exact absurd (SetLike.coe_mem _) h1
       · rintro y ⟨hy, pair⟩
         rw [flift, lambda_spec] at pair
         obtain ⟨-, -, eq⟩ := pair
         rw [dite_cond_eq_true (eq_true hy)] at eq
         split_ifs at eq with issome
-        · rw [←Subtype.ext_iff] at eq
-          nomatch ZFSet.Option.some_ne_none _ eq.symm
+        · nomatch ZFSet.Option.some_ne_none _ (Subtype.val_inj.mp eq).symm
         · have := @ZFSet.Option.ne_none_is_some _ ⟨y, hy⟩
-          rwa [imp_iff_not issome, not_not, Subtype.ext_iff] at this
+          rw [imp_iff_not issome, not_not] at this
+          exact Subtype.ext_iff.mp this
     · obtain ⟨x, ⟨hx, fxy⟩, x_unq⟩ := hbij y ‹_›
       use (Option.some ⟨x, hx⟩).val
       and_intros
       · apply SetLike.coe_mem
-      · rw [flift, lambda_spec, dite_cond_eq_true (eq_true (SetLike.coe_mem _))]
-        and_intros
-        · apply SetLike.coe_mem
-        · apply SetLike.coe_mem
-        · split_ifs with isnone
-          · have := Classical.choose_spec isnone
-            change some _ = some _ at this
-            rw [Option.some.injEq, Subtype.ext_iff] at this
-            dsimp at this
-            rw [←Subtype.ext_iff, Option.some.injEq, eq_comm]
-            apply fapply.of_pair
-            rwa [this] at fxy
-          · simp only [Subtype.coe_eta, exists_apply_eq_apply', not_true_eq_false] at isnone
+      · rw [flift, lambda_spec]
+        refine ⟨SetLike.coe_mem _, SetLike.coe_mem _, ?_⟩
+        split_ifs with h1 isnone
+        · have := Classical.choose_spec isnone
+          change some _ = some _ at this
+          rw [Option.some.injEq, Subtype.ext_iff] at this
+          dsimp at this
+          refine Subtype.ext_iff.mp (congrArg (Option.some (S := B)) ?_)
+          symm
+          apply fapply.of_pair
+          rwa [this] at fxy
+        · exact absurd ⟨⟨x, hx⟩, rfl⟩ isnone
+        · exact absurd (SetLike.coe_mem _) h1
       · rintro z ⟨hz, fzy⟩
         rw [flift, lambda_spec] at fzy
         obtain ⟨-, -, eq⟩ := fzy
         rw [dite_cond_eq_true (eq_true hz)] at eq
         split_ifs at eq with issome
-        · rw [←Subtype.ext_iff, Option.some.injEq, Subtype.ext_iff] at eq
-          obtain rfl := eq
-          have := Classical.choose_spec issome
-          rw [Subtype.ext_iff] at this
+        · obtain rfl := Subtype.ext_iff.mp <| Option.some.injEq.mp <| Subtype.ext_iff.mpr eq
+          have := Subtype.ext_iff.mp <| Classical.choose_spec issome
           dsimp at this
-          rw [this, ←Subtype.ext_iff, Option.some.injEq]
+          rw [this]
+          refine Subtype.ext_iff.mp (congrArg (Option.some (S := A)) ?_)
           have := fapply.of_pair (is_func_is_pfunc hf) fxy
           simp only [Subtype.coe_eta] at this
           rw [←bijective_exists1_iff hf] at hbij
           symm
           have := IsInjective.apply_inj hf hbij.1 this
           rwa [Subtype.ext_iff] at this ⊢
-        · rw [←Subtype.ext_iff] at eq
-          nomatch ZFSet.Option.some_ne_none _ eq
+        · nomatch ZFSet.Option.some_ne_none _ (Subtype.val_inj.mp eq)
 
 end Option
 

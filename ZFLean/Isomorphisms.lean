@@ -439,7 +439,7 @@ theorem isIso_funs_to_pow_rel {A B : ZFSet} : A.funs B.powerset ≅ᶻ (A.prod B
                                               rw [mem_prod] at hz
                                               obtain ⟨_, _, _, _, rfl⟩ := hz
                                               rwa [π₁_pair]
-                                            z.π₂ ∈ (@ᶻf ⟨z.π₁, by rwa [is_func_dom_eq hf]⟩).val
+                                            z.π₂ ∈ (@ᶻf ⟨z.π₁, by zdom⟩).val
                                           else False
                                       else ∅
   let G := λᶻ : (A.prod B).powerset → (A.funs B.powerset)

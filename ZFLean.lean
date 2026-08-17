@@ -1,6 +1,9 @@
 import ZFLean.Booleans
 import ZFLean.Integers
+import ZFLean.IntegerDivision
 import ZFLean.Rationals
+import ZFLean.Recursion
+import ZFLean.Sum
 import ZFLean.Embeddings
 import ZFLean.Isomorphisms
 import ZFLean.Tactics
