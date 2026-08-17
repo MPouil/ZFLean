@@ -390,7 +390,7 @@ noncomputable def flift {A B : ZFSet} (f : ZFSet)
       |          x       ↦ if hx : x ∈ Option.toZFSet A then
                               if isSome : ∃ y, ⟨x, hx⟩ = some y then
                                 let ⟨y, hy⟩ := Classical.choose isSome
-                                some (S := B) (@ᶻf ⟨y, by rwa [ZFSet.is_func_dom_eq]⟩) |>.val
+                                some (S := B) (@ᶻf ⟨y, by zdom⟩) |>.val
                               else none (S := B).val
                             else ∅
   have hf' : IsFunc (Option.toZFSet A) (Option.toZFSet B) f' := by
