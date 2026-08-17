@@ -707,6 +707,21 @@ theorem rec_succ.{u} {motive : ZFNat → Sort u} (n : ZFNat)
   rec (succ n) zero succ' = succ' n (ZFNat.rec n zero succ') := by
     simp [ZFNat.rec, succ, ZFNat.rec'_succ _ n.property]
 
+/--
+Uniqueness half of the universal property of `ZFNat`: `ZFNat.rec` is the *only* family
+satisfying the two computation rules `rec_zero` and `rec_succ`.
+
+Together with `rec_zero`/`rec_succ` this says that `(ZFNat, 0, succ)` is initial among
+sets equipped with a point and an endomorphism.
+-/
+theorem rec_unique.{u} {motive : ZFNat → Sort u} (zero : motive 0)
+  (succ' : Π x, motive x → motive (succ x)) (f : Π x, motive x)
+  (h₀ : f 0 = zero) (hs : ∀ x, f (succ x) = succ' x (f x)) (n : ZFNat) :
+    f n = ZFNat.rec n zero succ' := by
+  induction n using ZFNat.rec with
+  | zero => rw [h₀, rec_zero]
+  | succ n ih => rw [hs, rec_succ, ih]
+
 end Recursion
 
 /--

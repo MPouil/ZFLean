@@ -168,6 +168,18 @@ theorem casesOn_of_inr {A B : ZFSet} {motive : A ⊎ B → Sort*} (a : {x // x �
   · rw [inr, π₁_pair]
     exact zftrue_ne_zffalse
 
+/--
+Uniqueness half of the universal property of the disjoint sum: `casesOn` is the *only*
+family agreeing with `inl_case` along `inl` and with `inr_case` along `inr`.
+-/
+theorem casesOn_unique {A B : ZFSet} {motive : A ⊎ B → Sort*}
+  (inl_case : Π a, motive (inl a)) (inr_case : Π b, motive (inr b)) (g : Π x, motive x)
+  (hinl : ∀ a, g (inl a) = inl_case a) (hinr : ∀ b, g (inr b) = inr_case b) (x : A ⊎ B) :
+    g x = casesOn x inl_case inr_case := by
+  cases x with
+  | inl a => rw [hinl, casesOn_of_inl]
+  | inr b => rw [hinr, casesOn_of_inr]
+
 noncomputable def equivSum {A B : ZFSet} : A ⊎ B ≃ ({x // x ∈ A} ⊕ {x // x ∈ B}) where
   toFun x := by
     cases x with
@@ -244,6 +256,49 @@ theorem casesOn {S : ZFSet} (x : Option S) : x = none ∨ (∃ y, x = some y) :=
     · rw [pair_mem_prod] at hx
       unfold some Sum.inr
       exists ⟨val, hx.right⟩
+
+/-- The left summand of `Option S` is a singleton: every `inl` is `none`. -/
+theorem inl_eq_none {S : ZFSet} (a : {x // x ∈ ({∅} : ZFSet)}) : (Sum.inl a : Option S) = none :=
+  congrArg Sum.inl (Subtype.ext (mem_singleton.mp a.2))
+
+/--
+Cases elimination for `Option`, the data-level counterpart of the disjunction
+`Option.casesOn`. It is `Sum.casesOn` on `{∅} ⊎ S`, using `inl_eq_none` to collapse the
+left summand.
+-/
+noncomputable def elim.{v} {S : ZFSet} {motive : Option S → Sort v} (x : Option S)
+  (none_case : motive none) (some_case : Π y, motive (some y)) : motive x := by
+  refine Sum.casesOn (motive := motive) x (fun a => ?_) some_case
+  rw [inl_eq_none a]
+  exact none_case
+
+/-- Computation rule of `elim` on `none`. -/
+@[simp]
+theorem elim_of_none {S : ZFSet} {motive : Option S → Sort*}
+  (none_case : motive none) (some_case : Π y, motive (some y)) :
+    elim none none_case some_case = none_case := by
+  rw [elim, Sum.casesOn_of_inl]
+  rfl
+
+/-- Computation rule of `elim` on `some`. -/
+@[simp]
+theorem elim_of_some {S : ZFSet} {motive : Option S → Sort*}
+  (none_case : motive none) (some_case : Π y, motive (some y)) (y : {x // x ∈ S}) :
+    elim (some y) none_case some_case = some_case y := by
+  rw [elim, Sum.casesOn_of_inr]
+
+/--
+Uniqueness half of the universal property of `Option`: `elim` is the *only* family
+agreeing with `none_case` on `none` and with `some_case` along `some`.
+-/
+theorem elim_unique {S : ZFSet} {motive : Option S → Sort*}
+  (none_case : motive none) (some_case : Π y, motive (some y)) (g : Π x, motive x)
+  (hnone : g none = none_case) (hsome : ∀ y, g (some y) = some_case y) (x : Option S) :
+    g x = elim x none_case some_case := by
+  refine Sum.casesOn (motive := fun x => g x = elim x none_case some_case) x (fun a => ?_) ?_
+  · rw [inl_eq_none a, hnone, elim_of_none]
+  · intro y
+    rw [hsome, elim_of_some]
 
 -- theorem ZFInt.into.injective : Function.Injective into := into_inj
 -- theorem ZFInt.outof.injective : Function.Injective outof := outof_inj

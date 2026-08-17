@@ -196,6 +196,40 @@ def casesOn {motive : ZFBool → Sort _}
     subst this
     exact true
 
+/-- Computation rule of `casesOn` on `⊥`. -/
+@[simp]
+theorem casesOn_of_false {motive : ZFBool → Sort*}
+  (false_case : motive ⊥) (true_case : motive ⊤) :
+    ZFBool.casesOn ⊥ false_case true_case = false_case := by
+  rw [casesOn]
+  dsimp only
+  split
+  · rfl
+  · exact absurd rfl ‹_›
+
+/-- Computation rule of `casesOn` on `⊤`. -/
+@[simp]
+theorem casesOn_of_true {motive : ZFBool → Sort*}
+  (false_case : motive ⊥) (true_case : motive ⊤) :
+    ZFBool.casesOn ⊤ false_case true_case = true_case := by
+  rw [casesOn]
+  dsimp only
+  split
+  · exact absurd ‹_› zftrue_ne_zffalse
+  · rfl
+
+/--
+Uniqueness half of the universal property of `ZFBool`: `casesOn` is the *only* family
+agreeing with `false_case` on `⊥` and with `true_case` on `⊤`.
+-/
+theorem casesOn_unique {motive : ZFBool → Sort*}
+  (false_case : motive ⊥) (true_case : motive ⊤) (g : Π p, motive p)
+  (hfalse : g ⊥ = false_case) (htrue : g ⊤ = true_case) (p : ZFBool) :
+    g p = ZFBool.casesOn p false_case true_case := by
+  cases p using ZFBool.casesOn with
+  | false => rw [hfalse, casesOn_of_false]
+  | true => rw [htrue, casesOn_of_true]
+
 /-- Boolean conjunction, defined as set intersection. -/
 protected abbrev and (p q : ZFBool) : ZFBool :=
   let ⟨P, hP⟩ := p
