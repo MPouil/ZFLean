@@ -4,6 +4,8 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Vincent Trélat
 -/
 import ZFLean.Integers
+import ZFLean.TransferAlgebra
+import Mathlib.Data.Rat.Cast.Order
 
 /-! # ZFC Rational Numbers
 
@@ -817,6 +819,68 @@ instance : MulPosStrictMono ZFRat where
 end Order
 
 end Arithmetic
+/-! ## Transfer to `ℚ`
+
+`ZFRat` and `ℚ` are the same field: the ring morphism `ℚ →+* ZFRat` given by the `RatCast`
+instance is injective because `ZFRat` has characteristic zero, and surjective because every
+`mk (a, b)` is the quotient of the images of two integers. The resulting equivalence is
+registered as a `TransferEquiv`, so that the `transfer` tactic reads a goal about `ZFRat` in `ℚ`:
+
+```
+example (x y : ZFRat) : x + y = y + x := by
+  transfer ZFRat → ℚ =>
+    rw [add_comm]
+```
+
+The field operations, the numerals and the casts travel through the generic `map_…` lemmas of
+the `transfer_simps` simp set; the order relations are tagged below.
+-/
+
+section Transfer
+
+instance instCharZero : CharZero ZFRat := AddMonoidWithOne.toCharZero
+
+private theorem ratCast_surjective : Function.Surjective ((↑) : ℚ → ZFRat) := by
+  intro x
+  induction x using Quotient.ind with
+  | _ x =>
+    obtain ⟨a, b⟩ := x
+    refine ⟨(ZFInt.equivInt a : ℚ) / (ZFInt.equivInt b.val : ℚ), ?_⟩
+    rw [Rat.cast_div, Rat.cast_intCast, Rat.cast_intCast, intCast_eq_mk, intCast_eq_mk,
+      ZFInt.intCast_equivInt, ZFInt.intCast_equivInt, ← mk_eq_div]
+    rfl
+
+/-- The canonical ring equivalence between the quotient construction `ZFRat` and Lean's `ℚ`. -/
+noncomputable def equivRat : ZFRat ≃+* ℚ :=
+  (RingEquiv.ofBijective (Rat.castHom ZFRat)
+    ⟨Rat.cast_injective, ratCast_surjective⟩).symm
+
+@[simp, transfer_simps high]
+theorem equivRat_ratCast (q : ℚ) : equivRat (q : ZFRat) = q := by
+  change equivRat (equivRat.symm q) = q
+  exact equivRat.apply_symm_apply q
+
+@[simp]
+theorem ratCast_equivRat (x : ZFRat) : ((equivRat x : ℚ) : ZFRat) = x := by
+  change equivRat.symm (equivRat x) = x
+  exact equivRat.symm_apply_apply x
+
+theorem equivRat_le (a b : ZFRat) : equivRat a ≤ equivRat b ↔ a ≤ b := by
+  constructor <;> intro h
+  · have h' : ((equivRat a : ℚ) : ZFRat) ≤ ((equivRat b : ℚ) : ZFRat) := Rat.cast_mono h
+    rwa [ratCast_equivRat, ratCast_equivRat] at h'
+  · rwa [← ratCast_equivRat a, ← ratCast_equivRat b, Rat.cast_strictMono.le_iff_le] at h
+
+theorem equivRat_lt (a b : ZFRat) : equivRat a < equivRat b ↔ a < b := by
+  rw [lt_iff_not_ge, lt_iff_not_ge, equivRat_le]
+
+/-- Equivalence used by the `transfer` tactic to move goals between `ZFRat` and `ℚ`. -/
+noncomputable instance : TransferEquiv ZFRat ℚ := ⟨equivRat.toEquiv⟩
+
+attribute [transfer_simps ←] equivRat_le equivRat_lt
+
+end Transfer
+
 end ZFRat
 end Rationals
 end ZFSet
