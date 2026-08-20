@@ -4,6 +4,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Vincent Trélat
 -/
 import ZFLean.Naturals
+import ZFLean.TransferAlgebra
 import Mathlib.Algebra.EuclideanDomain.Basic
 import Mathlib.Algebra.EuclideanDomain.Int
 import Mathlib.Algebra.Order.Ring.Cast
@@ -1692,6 +1693,42 @@ theorem fmod_eq_zero {a b : ZFInt} : fmod a b = 0 ↔ b ∣ a := by
 end
 
 end ZFInt
+
+/-! ## Transfer to `ℤ`
+
+`equivInt` is registered as a `TransferEquiv`, so that the `transfer` tactic reads a goal about
+`ZFInt` in `ℤ`:
+
+```
+example (a b : ZFInt) : a + b = b + a := by
+  transfer ZFInt → ℤ =>
+    rw [Int.add_comm]
+```
+
+The ring operations, the numerals and the casts travel through the generic `map_…` lemmas of the
+`transfer_simps` simp set; the order relations and the two division conventions are the lemmas
+proved above, tagged here.
+-/
+
+section Transfer
+
+namespace ZFInt
+
+/-- Equivalence used by the `transfer` tactic to move goals between `ZFInt` and `ℤ`. -/
+noncomputable instance : TransferEquiv ZFInt ℤ := ⟨equivInt.toEquiv⟩
+
+/-- Divisibility is read in `ℤ`; `map_dvd_iff` reads the wrong way round for `transfer`. -/
+@[transfer_simps] theorem equivInt_dvd (a b : ZFInt) :
+    a ∣ b ↔ equivInt a ∣ equivInt b := (map_dvd_iff equivInt).symm
+
+attribute [transfer_simps ←] equivInt_le equivInt_lt
+
+attribute [transfer_simps] equivInt_abs equivInt_div equivInt_mod equivInt_ediv equivInt_emod
+  equivInt_fdiv equivInt_fmod
+
+end ZFInt
+
+end Transfer
 
 end Integers
 end ZFSet
