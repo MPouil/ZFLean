@@ -4,6 +4,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Vincent Trélat
 -/
 import ZFLean.Basic
+import ZFLean.TransferAlgebra
 import Mathlib.Algebra.Ring.Defs
 import Mathlib.Tactic.Ring
 
@@ -1631,6 +1632,100 @@ def ZFNat.equivZFNat_Nat : ZFNat ≃ ℕ where
     | succ n ih =>
       rw [ofNat, nsmul, add_one_eq_succ', ←ofNat, toNat, ZFNat.rec_succ, ←toNat, ih]
 
+
+/-! ## Transfer to `ℕ`
+
+`equivZFNat_Nat` says that `ZFNat` and `ℕ` are the same type. Upgraded to a ring isomorphism and
+registered as a `TransferEquiv`, it lets the `transfer` tactic read a goal about `ZFNat` in `ℕ`:
+
+```
+example (n m : ZFNat) : n + m = m + n := by
+  transfer ZFNat → ℕ =>
+    rw [Nat.add_comm]
+```
+
+The block is proved in `ℕ`, and closing it closes the goal about `ZFNat`. The ring operations,
+the numerals and the casts travel through the generic `map_…` lemmas of the `transfer_simps`
+simp set; what those lemmas do not cover is stated here: `succ`, the truncated subtraction, the
+homogeneous power, and the two order relations.
+-/
+
+section Transfer
+
+namespace ZFNat
+
+theorem toNat_zero : (0 : ZFNat).toNat = 0 := by rw [toNat, rec_zero]
+
+theorem toNat_succ (a : ZFNat) : (succ a).toNat = a.toNat.succ := by
+  rw [toNat, ZFNat.rec_succ]
+  rfl
+
+theorem toNat_one : (1 : ZFNat).toNat = 1 := by rw [nat_one_eq, toNat_succ, toNat_zero]
+
+theorem toNat_pred (a : ZFNat) : (pred a).toNat = a.toNat.pred := by
+  by_cases h : a = 0
+  · subst h
+    rw [pred_zero, toNat_zero]
+    rfl
+  · obtain ⟨b, rfl⟩ := not_zero_imp_succ h
+    rw [pred_succ, toNat_succ, Nat.pred_succ]
+
+theorem toNat_add (a b : ZFNat) : (a + b).toNat = a.toNat + b.toNat :=
+  ofNat_inj.mp (by rw [Nat.cast_add, toNat_eq, toNat_eq, toNat_eq])
+
+theorem toNat_mul (a b : ZFNat) : (a * b).toNat = a.toNat * b.toNat :=
+  ofNat_inj.mp (by rw [Nat.cast_mul, toNat_eq, toNat_eq, toNat_eq])
+
+theorem toNat_sub (a b : ZFNat) : (a - b).toNat = a.toNat - b.toNat := by
+  induction b with
+  | zero => rw [sub_zero, toNat_zero, Nat.sub_zero]
+  | succ b ih => rw [add_one_eq_succ, sub_succ, toNat_pred, ih, toNat_succ, Nat.sub_succ]
+
+theorem toNat_pow (a b : ZFNat) : (a ^ b).toNat = a.toNat ^ b.toNat := by
+  induction b with
+  | zero => rw [pow_zero, toNat_one, toNat_zero, Nat.pow_zero]
+  | succ b ih => rw [add_one_eq_succ, pow_succ, toNat_mul, ih, toNat_succ, Nat.pow_succ]
+
+theorem toNat_le (a b : ZFNat) : a ≤ b ↔ a.toNat ≤ b.toNat where
+  mp h := by
+    obtain ⟨k, rfl⟩ := le.dest h
+    rw [toNat_add]
+    exact Nat.le_add_right _ _
+  mpr h := by
+    obtain ⟨j, hj⟩ := Nat.le.dest h
+    refine le.intro (k := (j : ZFNat)) (toNat_iff.mpr ?_)
+    rw [toNat_add, toNat_is_id, hj]
+
+theorem toNat_lt (a b : ZFNat) : a < b ↔ a.toNat < b.toNat := by
+  rw [← le_lt_iff, toNat_le, toNat_succ, Nat.succ_le_iff]
+
+/-- `equivZFNat_Nat` as a ring isomorphism. -/
+def ringEquivNat : ZFNat ≃+* ℕ :=
+  { equivZFNat_Nat with map_add' := toNat_add, map_mul' := toNat_mul }
+
+/-- Equivalence used by the `transfer` tactic to move goals between `ZFNat` and `ℕ`. -/
+instance : TransferEquiv ZFNat ℕ := ⟨ringEquivNat.toEquiv⟩
+
+@[transfer_simps] theorem ringEquivNat_succ (a : ZFNat) :
+    ringEquivNat (succ a) = (ringEquivNat a).succ := toNat_succ a
+
+@[transfer_simps] theorem ringEquivNat_sub (a b : ZFNat) :
+    ringEquivNat (a - b) = ringEquivNat a - ringEquivNat b := toNat_sub a b
+
+@[transfer_simps] theorem ringEquivNat_pow (a b : ZFNat) :
+    ringEquivNat (a ^ b) = ringEquivNat a ^ ringEquivNat b := toNat_pow a b
+
+@[transfer_simps] theorem ringEquivNat_dvd (a b : ZFNat) :
+    a ∣ b ↔ ringEquivNat a ∣ ringEquivNat b := (map_dvd_iff ringEquivNat).symm
+
+@[transfer_simps] theorem ringEquivNat_le (a b : ZFNat) :
+    a ≤ b ↔ ringEquivNat a ≤ ringEquivNat b := toNat_le a b
+
+@[transfer_simps] theorem ringEquivNat_lt (a b : ZFNat) :
+    a < b ↔ ringEquivNat a < ringEquivNat b := toNat_lt a b
+end ZFNat
+
+end Transfer
 
 end Naturals
 end ZFSet
