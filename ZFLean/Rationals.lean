@@ -100,6 +100,10 @@ theorem mk_eq_zero_iff {n m} : ZFRat.mk (n,m) = 0 ↔ n = 0 where
     apply ZFRat.sound
     rw [ZFSet.qrel, mul_one, mul_zero]
 
+theorem mk_ne_zero {a : ZFInt} {b : ZFInt'} (ha : a ≠ 0) : mk (a, b) ≠ 0 := by
+  rw [ne_eq, mk_eq_zero_iff]
+  exact ha
+
 theorem mk_eq_one_iff {n m} : ZFRat.mk (n,m) = 1 ↔ n = m where
   mp := by
     intro h
@@ -424,6 +428,23 @@ noncomputable instance : CommRing ZFRat where
   zsmul_neg' _ _ := rfl
   neg_add_cancel _ := add_left_neg
 
+theorem intCast_eq_mk (n : ℤ) :
+    ((n : ℤ) : ZFRat) = mk ((n : ZFInt), ⟨1, ZFInt.one_ne_zero⟩) := by
+  induction n using Int.induction_on with
+  | zero => rw [Int.cast_zero, Int.cast_zero, ← zero_eq]
+  | succ k ih =>
+    simp only [Int.cast_add, Int.cast_one]
+    rw [ih, one_eq, add_eq]
+    apply sound
+    rw [ZFSet.qrel]
+    ring
+  | pred k ih =>
+    simp only [Int.cast_sub, Int.cast_one]
+    rw [ih, one_eq, sub_eq]
+    apply sound
+    rw [ZFSet.qrel]
+    ring
+
 section Div
 
 abbrev ZFRat' := {x : ZFRat // x ≠ 0}
@@ -492,6 +513,18 @@ theorem inv_mul' {a : ZFRat'} : a⁻¹ * a.1 = 1 := by
 theorem inv_mul {a : ZFRat} (ha : a ≠ 0) : a⁻¹ * a = 1 := by
   rw [mul_comm]
   exact mul_inv ha
+
+theorem mk_eq_div (a : ZFInt) (b : ZFInt') :
+    mk (a, b) = mk (a, ⟨1, ZFInt.one_ne_zero⟩) / mk (b.val, ⟨1, ZFInt.one_ne_zero⟩) := by
+  have hb : mk (b.val, ⟨1, ZFInt.one_ne_zero⟩) ≠ 0 := mk_ne_zero b.2
+  have key : mk (a, b) * mk (b.val, ⟨1, ZFInt.one_ne_zero⟩)
+      = mk (a, ⟨1, ZFInt.one_ne_zero⟩) := by
+    rw [mul_eq]
+    apply sound
+    rw [ZFSet.qrel]
+    ring
+  rw [div_eq_mul_inv hb, ← inv_eq hb, ← key, mul_assoc, mul_inv hb, mul_one]
+
 end Div
 
 noncomputable instance : RatCast ZFRat where
