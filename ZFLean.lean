@@ -6,3 +6,4 @@ import ZFLean.Sum
 import ZFLean.Embeddings
 import ZFLean.Isomorphisms
 import ZFLean.Tactics
+import ZFLean.Examples
