@@ -1457,6 +1457,9 @@ lemma pow_zero {n : ZFNat} : n ^ 0 = 1 := by
 lemma pow_one {n : ZFNat} : n ^ 1 = n := by
   rw [pow_inst_eq, ZFNat.pow, nat_one_eq, rec_succ, rec_zero, ← nat_one_eq, one_mul]
 
+lemma pow_succ {n p : ZFNat} : n ^ succ p = n ^ p * n := by
+  rw [pow_inst_eq, ZFNat.pow, ZFNat.rec_succ, ← ZFNat.pow, ← pow_inst_eq]
+
 end Arithmetic
 
 /--
