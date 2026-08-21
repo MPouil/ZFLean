@@ -137,7 +137,12 @@ private def freshEquiv (eAbs : AbstractMVarsResult) : MetaM (Expr × Expr) := do
 is the source of. -/
 private def matchSource? (eAbs : AbstractMVarsResult) (t : Expr) : MetaM (Option Expr) := do
   let (E, α) ← freshEquiv eAbs
-  match α.getAppFn, t.getAppFn with
+  -- The heads are compared after unfolding the reducible definitions, so that an abbreviation
+  -- such as `ZFNat` and its unfolding `↥Nat` are recognised as the same type. A subterm under a
+  -- binder still carries its loose bound variables, which `whnf` would choke on.
+  let head (x : Expr) : MetaM Expr := do
+    if x.hasLooseBVars then return x.getAppFn else return (← whnfR x).getAppFn
+  match ← head α, ← head t with
   | .const a _, .const b _ => if a != b then return none
   | .fvar a, .fvar b => if a != b then return none
   | _, _ => return none
@@ -218,6 +223,7 @@ private def transferTheorems (congrs : Array (Expr × Expr)) : MetaM SimpTheorem
     | throwError "transfer: the `transfer_simps` simp set is not available"
   let mut thms ← ext.getTheorems
   for thm in [``ne_eq, ``Equiv.apply_symm_apply, ``Equiv.symm_apply_apply, ``Equiv.symm_symm,
+      ``Equiv.trans_apply, ``Equiv.symm_trans_apply,
       ``Equiv.refl_apply, ``Equiv.refl_symm,
       ``arrowCongr_apply, ``arrowCongr_symm_apply, ``arrowCongr_symm_iterate,
       ``prodCongr_apply, ``prodCongr_symm_apply] do
