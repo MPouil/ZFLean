@@ -62,6 +62,7 @@ attribute [transfer_simps]
   AddEquiv.toEquiv_eq_coe AddEquiv.coe_toEquiv AddEquiv.coe_toEquiv_symm
   RingEquiv.toEquiv_eq_coe RingEquiv.coe_toEquiv RingEquiv.coe_coe_toEquiv_symm
   OrderIso.coe_toEquiv
+  MulEquiv.symm_symm AddEquiv.symm_symm RingEquiv.symm_symm OrderIso.symm_symm
   MulEquiv.apply_symm_apply MulEquiv.symm_apply_apply
   AddEquiv.apply_symm_apply AddEquiv.symm_apply_apply
   RingEquiv.apply_symm_apply RingEquiv.symm_apply_apply

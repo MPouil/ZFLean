@@ -292,6 +292,17 @@ def transferGoal (e : Expr) (tacs : TSyntax ``Parser.Tactic.tacticSeq) : TacticM
     for t in (← fvars.mapM fun fvar => do return (← fvar.getDecl).type).push (← g.getType) do
       acc := (← (collectSources eAbs (← instantiateMVars t)).run acc).2
     return acc
+  -- A universe that the goal does not pin down is arbitrary — that happens when transferring
+  -- *to* a polymorphic type, as in `transfer ℕ → ZFNat`. Left as a metavariable it would stop
+  -- simp from matching anything at all, so fix it now that the goal has had its say.
+  g.withContext do
+    let mut st := collectLevelMVars {} (← instantiateMVars (← g.getType))
+    for fvar in fvars do
+      st := collectLevelMVars st (← instantiateMVars (← fvar.getType))
+    for (t, E) in congrs do
+      st := collectLevelMVars (collectLevelMVars st (← instantiateMVars t)) (← instantiateMVars E)
+    for u in st.result do
+      assignLevelMVar u Level.zero
   -- Push the equivalences through the goal and the reintroduced hypotheses.
   -- `failIfUnchanged := false`: a goal that is already free of `α` is left alone rather than
   -- making the tactic fail.
