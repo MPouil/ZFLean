@@ -3,7 +3,7 @@ Copyright (c) 2025 Vincent Trélat. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Vincent Trélat
 -/
-import ZFLean.Basic
+import ZFLean.Def
 
 /-!
 # Boolean algebra on `ZFSet`
@@ -23,33 +23,7 @@ It defines the following operations:
 
 noncomputable section
 
-/-! ## Preliminary definitions -/
-
 namespace ZFSet
-
-/-- Symmetric difference of two sets, denoted by `Δ`. -/
-def symmDiff (p q : ZFSet) : ZFSet := (p \ q) ∪ (q \ p)
-infix:70 " Δ " => symmDiff
-
-@[simp]
-theorem mem_symmDiff (x p q : ZFSet) : x ∈ p Δ q ↔ (x ∈ p ∧ x ∉ q) ∨ (x ∈ q ∧ x ∉ p) := by
-  simp only [symmDiff, mem_union, mem_sdiff]
-
-@[simp]
-theorem symmDiff_empty (p : ZFSet) : p Δ ∅ = p := by
-  ext x
-  simp only [mem_symmDiff, notMem_empty, not_false_eq_true, and_true, false_and, or_false]
-
-theorem symmDiff_comm (p q : ZFSet) : p Δ q = q Δ p := by
-  ext x
-  simp only [mem_symmDiff]
-  exact Or.comm
-
-@[simp]
-theorem symmDiff_self (p : ZFSet) : p Δ p = ∅ := by
-  ext x
-  simp only [mem_symmDiff, and_not_self, or_self, notMem_empty]
-
 section Booleans
 
 /-! ## ZF Boolean Algebra -/

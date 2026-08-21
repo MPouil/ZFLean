@@ -3,7 +3,7 @@ Copyright (c) 2025 Vincent Trélat. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Vincent Trélat
 -/
-import ZFLean.Basic
+import ZFLean.Def
 import ZFLean.TransferAlgebra
 import Mathlib.Algebra.Ring.Defs
 import Mathlib.Tactic.Ring
@@ -31,56 +31,6 @@ namespace ZFSet
 /-! ## Preliminary definitions -/
 
 section Preamble
-
-/--
-A set `x` is transitive if every element of `x` is a subset of `x`:
-`∀ y ∈ x, y ⊆ x`.
--/
-def transitive (x : ZFSet) := ∀ y ∈ x, y ⊆ x
-
-/--
-An inductive set is defined as a set that contains the empty set `∅` and is closed
-under successor.
-
-The "successor" of a set `x` is defined as the insertion of `x` into itself.
--/
-def inductive_set (E : ZFSet) : Prop := ∅ ∈ E ∧ ∀ n, n ∈ E → insert n n ∈ E
-
-theorem trans_imp_insert_trans {x : ZFSet} : transitive x → transitive (insert x x) := by
-  intro trans y
-  rw [mem_insert_iff]
-  rintro ⟨rfl | _⟩
-  · simp_rw [subset_def, mem_insert_iff]
-    exact fun _ => Or.inr
-  · simp_rw [subset_def, mem_insert_iff]
-    exact fun _ _ => Or.inr (trans y ‹_› ‹_›)
-
-theorem inductive_sep {S} (P : ZFSet → Prop) (ind : inductive_set S)
-  (h₀ : P ∅) (h₁ : ∀ n ∈ S, P n → P (insert n n)) : inductive_set <| S.sep P := by
-  unfold inductive_set at *
-  simp_rw [mem_sep]
-  apply And.intro
-  · exact ⟨ind.left, h₀⟩
-  · rintro n ⟨_,_⟩
-    apply And.intro
-    · exact ind.right n ‹_›
-    · exact h₁ n ‹_› ‹_›
-
-theorem inductive_imp_transitive {E : ZFSet} (h : inductive_set E) :
-  inductive_set (E.sep transitive) := by
-  unfold inductive_set
-  rcases h with ⟨_, hind⟩
-  apply And.intro <;> simp_rw [mem_sep]
-  · exact ⟨‹_›, by intro; rw [imp_iff_or_not]; exact Or.inr <| notMem_empty _⟩
-  · rintro n ⟨_,_⟩
-    apply And.intro
-    · exact hind n ‹_›
-    · exact trans_imp_insert_trans ‹_›
-
-notation "ω" => omega
-
-/-- The first Von Neumann ordinal `ω` is an inductive set. -/
-theorem omega_inductive : inductive_set ω := ⟨omega_zero, fun _ => omega_succ⟩
 
 /-- Witness for an infinite set, meant to be used for definitional purpose only. -/
 private abbrev some_inf := @Classical.choose _ inductive_set ⟨_, omega_inductive⟩
