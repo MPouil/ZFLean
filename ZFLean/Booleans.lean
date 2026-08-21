@@ -3,7 +3,8 @@ Copyright (c) 2025 Vincent Trélat. All rights reserved.
 Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Vincent Trélat
 -/
-import ZFLean.Basic
+import ZFLean.Def
+import ZFLean.Transfer
 
 /-!
 # Boolean algebra on `ZFSet`
@@ -18,38 +19,14 @@ It defines the following operations:
 - `𝔹` : set of ZF booleans
 - `toBool` : conversion from `ZFBool` to `Bool`
 - `ofBool` : conversion from `Bool` to `ZFBool`
+- `equivBool` : the equivalence `ZFBool ≃ Bool`, along which goals are transferred
+- `equivProp` : the classical equivalence `ZFBool ≃ Prop`, the other reading of `ZFBool`
 
 -/
 
 noncomputable section
 
-/-! ## Preliminary definitions -/
-
 namespace ZFSet
-
-/-- Symmetric difference of two sets, denoted by `Δ`. -/
-def symmDiff (p q : ZFSet) : ZFSet := (p \ q) ∪ (q \ p)
-infix:70 " Δ " => symmDiff
-
-@[simp]
-theorem mem_symmDiff (x p q : ZFSet) : x ∈ p Δ q ↔ (x ∈ p ∧ x ∉ q) ∨ (x ∈ q ∧ x ∉ p) := by
-  simp only [symmDiff, mem_union, mem_sdiff]
-
-@[simp]
-theorem symmDiff_empty (p : ZFSet) : p Δ ∅ = p := by
-  ext x
-  simp only [mem_symmDiff, notMem_empty, not_false_eq_true, and_true, false_and, or_false]
-
-theorem symmDiff_comm (p q : ZFSet) : p Δ q = q Δ p := by
-  ext x
-  simp only [mem_symmDiff]
-  exact Or.comm
-
-@[simp]
-theorem symmDiff_self (p : ZFSet) : p Δ p = ∅ := by
-  ext x
-  simp only [mem_symmDiff, and_not_self, or_self, notMem_empty]
-
 section Booleans
 
 /-! ## ZF Boolean Algebra -/
@@ -571,6 +548,147 @@ theorem and_or_distrib_left (p q r : ZFBool) : p ⋀ (q ⋁ r) = (p ⋀ q) ⋁ (
 
 end ZFBool
 end AdditionnalLemmas
+
+/-! ## Transfer to `Bool` and to `Prop`
+
+`ZFBool` is the same type as `Bool`, through `equivBool`, and — classically — the same type as
+`Prop`, through `equivProp`. Both readings are available to the `transfer` tactic:
+
+```
+example (p q : ZFBool) : p ⋀ q = q ⋀ p := by
+  transfer ZFBool → Bool =>
+    exact Bool.and_comm p q
+
+example (p q : ZFBool) : p ⋀ q = q ⋀ p := by
+  transfer ZFBool → Prop using ZFBool.equivProp =>
+    exact and_comm
+```
+
+The block is proved in the target type, and closing it closes the goal about `ZFBool`. `Bool` is
+the one registered as a `TransferEquiv`: the class takes its target as an `outParam`, so a type
+has at most one instance, and the `Prop` reading is asked for with `using ZFBool.equivProp` (or
+`transfer ZFBool.equivProp => …`).
+
+`ZFBool` carries no algebraic structure, so nothing comes for free from the `map_…` lemmas of
+`TransferAlgebra`: the two constants and the three connectives are stated below, once per
+reading. Those about the connectives need `no_index` on their left-hand side, because
+`ZFBool.and`, `ZFBool.or` and `ZFBool.not` are abbreviations: indexed as they stand, they would
+be unfolded to the underlying set operations and never fire.
+-/
+
+section Transfer
+
+namespace ZFBool
+
+/-! ### The coercions
+
+A `ZFBool` read as a proposition is `p.toBool = true`, the coercion to `Bool` followed by the
+coercion of a `Bool` to a proposition. Both readings need that to travel, so it is brought back
+to an equation in `ZFBool`, which the equivalence at hand is then pushed through. The lemma fires
+*before* its subterms are visited: rewriting `p.toBool` into `equivBool p` first would leave a
+`Bool` behind, which is what only one of the two readings wants. A coerced `ZFBool` that is not
+compared to anything travels to `Bool` only, through `toBool_eq_equivBool` below. -/
+@[transfer_simps↓]
+theorem toBool_eq_iff (p : ZFBool) (b : Bool) : p.toBool = b ↔ p = ofBool b := by
+  constructor
+  · rintro rfl
+    rw [of_Bool_toBool]
+  · rintro rfl
+    rw [to_Bool_ofBool]
+
+attribute [transfer_simps] of_Bool_toBool
+
+@[transfer_simps] theorem ofBool_inj (b c : Bool) : ofBool b = ofBool c ↔ b = c := by
+  constructor
+  · intro h
+    rw [← to_Bool_ofBool b, ← to_Bool_ofBool c, h]
+  · rintro rfl
+    rfl
+
+@[transfer_simps] theorem ofBool_true : ofBool Bool.true = ⊤ := rfl
+
+@[transfer_simps] theorem ofBool_false : ofBool Bool.false = ⊥ := rfl
+
+/-! ### Transfer to `Bool` -/
+
+/-- Equivalence used by the `transfer` tactic to move goals between `ZFBool` and `Bool`. -/
+instance : TransferEquiv ZFBool Bool := ⟨equivBool⟩
+
+/-- A `ZFBool` left as a `Bool` is its image under the equivalence. -/
+@[transfer_simps] theorem toBool_eq_equivBool (p : ZFBool) : p.toBool = equivBool p := rfl
+
+@[transfer_simps] theorem equivBool_ofBool (b : Bool) : equivBool (ofBool b) = b :=
+  to_Bool_ofBool b
+
+@[transfer_simps] theorem equivBool_true : equivBool ZFBool.true = Bool.true := toBool_true
+
+@[transfer_simps] theorem equivBool_false : equivBool ZFBool.false = Bool.false := toBool_false
+
+@[transfer_simps] theorem equivBool_top : equivBool (⊤ : ZFBool) = Bool.true := toBool_true
+
+@[transfer_simps] theorem equivBool_bot : equivBool (⊥ : ZFBool) = Bool.false := toBool_false
+
+@[transfer_simps] theorem equivBool_and (p q : ZFBool) :
+    equivBool (no_index (p ⋀ q)) = (equivBool p && equivBool q) := toBool_and p q
+
+@[transfer_simps] theorem equivBool_or (p q : ZFBool) :
+    equivBool (no_index (p ⋁ q)) = (equivBool p || equivBool q) := toBool_or p q
+
+@[transfer_simps] theorem equivBool_not (p : ZFBool) :
+    equivBool (no_index p.not) = !equivBool p := by
+  cases p with
+  | false => rw [not_false_eq_true, equivBool_top, equivBool_bot]; rfl
+  | true => rw [not_true_eq_false, equivBool_bot, equivBool_top]; rfl
+
+/-! ### Transfer to `Prop`
+
+Classically `Bool` and `Prop` are the same type, so `ZFBool` is `Prop` as well: `equivProp p` is
+the proposition `p = ⊤`. Under this reading the connectives of `ZFBool` are the connectives of
+`Prop`, and an equation between `ZFBool`s is an equivalence of propositions. -/
+
+/-- The classical equivalence between `ZFBool` and `Prop`: `p` stands for the proposition that
+`p` is `⊤`. Not an instance, `Bool` being the registered target of `ZFBool`; pass it explicitly,
+as `transfer ZFBool → Prop using ZFBool.equivProp`. -/
+noncomputable def equivProp : ZFBool ≃ Prop := equivBool.trans Equiv.propEquivBool.symm
+
+theorem equivProp_apply (p : ZFBool) : equivProp p = (p.toBool = Bool.true) := rfl
+
+@[transfer_simps] theorem equivProp_ofBool (b : Bool) : equivProp (ofBool b) ↔ b := by
+  rw [equivProp_apply, to_Bool_ofBool]
+
+@[transfer_simps] theorem equivProp_top : equivProp (⊤ : ZFBool) ↔ True :=
+  iff_of_true toBool_true trivial
+
+@[transfer_simps] theorem equivProp_bot : equivProp (⊥ : ZFBool) ↔ False := by
+  change (⊥ : ZFBool).toBool = Bool.true ↔ False
+  rw [toBool_false]
+  exact iff_of_false Bool.false_ne_true not_false
+
+@[transfer_simps] theorem equivProp_true : equivProp ZFBool.true ↔ True := equivProp_top
+
+@[transfer_simps] theorem equivProp_false : equivProp ZFBool.false ↔ False := equivProp_bot
+
+@[transfer_simps] theorem equivProp_and (p q : ZFBool) :
+    equivProp (no_index (p ⋀ q)) ↔ (equivProp p ∧ equivProp q) := by
+  rw [equivProp_apply, equivProp_apply, equivProp_apply, toBool_and, Bool.and_eq_true]
+
+@[transfer_simps] theorem equivProp_or (p q : ZFBool) :
+    equivProp (no_index (p ⋁ q)) ↔ (equivProp p ∨ equivProp q) := by
+  rw [equivProp_apply, equivProp_apply, equivProp_apply, toBool_or, Bool.or_eq_true]
+
+@[transfer_simps] theorem equivProp_not (p : ZFBool) :
+    equivProp (no_index p.not) ↔ ¬ equivProp p := by
+  cases p with
+  | false => rw [not_false_eq_true, equivProp_top, equivProp_bot]; simp
+  | true => rw [not_true_eq_false, equivProp_bot, equivProp_top]; simp
+
+-- An equation between propositions is their equivalence, and this is what an equation between
+-- `ZFBool`s becomes once `equivProp` has been pushed through it.
+attribute [transfer_simps] eq_iff_iff iff_true true_iff iff_false false_iff
+
+end ZFBool
+
+end Transfer
 
 end ZFSet
 

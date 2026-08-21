@@ -4,6 +4,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Authors: Vincent Trélat
 -/
 import Mathlib.CategoryTheory.Category.Basic
+import ZFLean.Transfer
 
 /-!
 # Custom tactics for ZF
