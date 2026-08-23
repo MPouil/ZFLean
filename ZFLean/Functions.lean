@@ -679,8 +679,10 @@ element of `A`.
 theorem mem_dom_of_mem {f A B : ZFSet} (hf : IsFunc A B f) {x : ZFSet} (hx : x ∈ A) :
     x ∈ Dom f (is_rel_of_is_func hf) := by rwa [is_func_dom_eq hf]
 
-/-- Converse of `mem_dom_of_mem`: the domain of a partial function is contained in its source. -/
-@[zdom]
+/-- Converse of `mem_dom_of_mem`: the domain of a partial function is contained in its source.
+A `zdom_conv` seed rather than a `zdom` one: in the main search it would let `solve_by_elim`
+loop between `x ∈ A` and `x ∈ f.Dom` (see `ZFLean/Tactics.lean`). -/
+@[zdom_conv]
 theorem mem_of_mem_dom {f A B : ZFSet} (hf : f.IsPFunc A B) {x : ZFSet} (hx : x ∈ f.Dom) : x ∈ A :=
   pfun_dom_subset f hf hx
 
@@ -1390,8 +1392,7 @@ theorem fapply_eq_Image_singleton {A B : ZFSet} {f : ZFSet}
 theorem fapply_composition {g f : ZFSet} {A B C : ZFSet}
   (hg : B.IsFunc C g) (hf : A.IsFunc B f) {x : ZFSet} (xA : x ∈ A) :
   @ᶻ(g ∘ᶻ f) ⟨x, by zdom⟩ =
-    @ᶻg ⟨@ᶻf ⟨x, by zdom⟩,
-      by rw [is_func_dom_eq]; apply fapply_mem_range⟩ := by
+    @ᶻg ⟨@ᶻf ⟨x, by zdom⟩, by zdom⟩ := by
   unfold fcomp
   rw [Subtype.ext_iff]
   rw [fapply_eq_Image_singleton (IsFunc_of_composition_IsFunc hg hf) xA,
