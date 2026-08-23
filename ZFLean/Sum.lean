@@ -298,9 +298,9 @@ theorem coprod_of_inl {A B X f g : ZFSet} (hf : IsFunc A X f) (hg : IsFunc B X g
     fapply (coprod f g hf hg) (coprod_is_pfunc hf hg)
         ⟨ZFSet.pair ZFBool.false.val a, by
           rw [is_func_dom_eq (coprod_is_func hf hg)]; exact pair_false_mem_toZFSet ha⟩
-      = @ᶻf ⟨a, by rwa [is_func_dom_eq hf]⟩ := by
+      = @ᶻf ⟨a, by zdom⟩ := by
   have key : (ZFSet.pair ZFBool.false.val a).pair
-      (@ᶻf ⟨a, by rwa [is_func_dom_eq hf]⟩ : {x // x ∈ X}).val ∈ coprod f g hf hg := by
+      (@ᶻf ⟨a, by zdom⟩ : {x // x ∈ X}).val ∈ coprod f g hf hg := by
     rw [coprod, lambda_spec]
     refine ⟨pair_false_mem_toZFSet ha, Subtype.property _, ?_⟩
     rw [dite_cond_eq_true (eq_true (pair_false_mem_toZFSet ha)),
@@ -314,9 +314,9 @@ theorem coprod_of_inr {A B X f g : ZFSet} (hf : IsFunc A X f) (hg : IsFunc B X g
     fapply (coprod f g hf hg) (coprod_is_pfunc hf hg)
         ⟨ZFSet.pair ZFBool.true.val b, by
           rw [is_func_dom_eq (coprod_is_func hf hg)]; exact pair_true_mem_toZFSet hb⟩
-      = @ᶻg ⟨b, by rwa [is_func_dom_eq hg]⟩ := by
+      = @ᶻg ⟨b, by zdom⟩ := by
   have key : (ZFSet.pair ZFBool.true.val b).pair
-      (@ᶻg ⟨b, by rwa [is_func_dom_eq hg]⟩ : {x // x ∈ X}).val ∈ coprod f g hf hg := by
+      (@ᶻg ⟨b, by zdom⟩ : {x // x ∈ X}).val ∈ coprod f g hf hg := by
     rw [coprod, lambda_spec]
     refine ⟨pair_true_mem_toZFSet hb, Subtype.property _, ?_⟩
     rw [dite_cond_eq_true (eq_true (pair_true_mem_toZFSet hb)),
@@ -328,7 +328,7 @@ theorem coprod_of_inr {A B X f g : ZFSet} (hf : IsFunc A X f) (hg : IsFunc B X g
 
 theorem fapply_inlFun {A B x : ZFSet} (hx : x ∈ A) :
     fapply (inlFun A B) (is_func_is_pfunc inlFun_is_func)
-        ⟨x, by rw [is_func_dom_eq (inlFun_is_func (A := A) (B := B))]; exact hx⟩
+        ⟨x, by zdom⟩
       = ⟨ZFSet.pair ZFBool.false.val x, pair_false_mem_toZFSet hx⟩ := by
   have key : x.pair (ZFSet.pair ZFBool.false.val x) ∈ inlFun A B := by
     rw [inlFun, lambda_spec]
@@ -341,14 +341,14 @@ theorem coprod_comp_inl {A B X f g : ZFSet} (hf : IsFunc A X f) (hg : IsFunc B X
   intro x hx
   rw [fapply_composition (coprod_is_func hf hg) inlFun_is_func hx]
   have hval : (fapply (inlFun A B) (is_func_is_pfunc inlFun_is_func)
-      ⟨x, by rw [is_func_dom_eq (inlFun_is_func (A := A) (B := B))]; exact hx⟩).val
+      ⟨x, by zdom⟩).val
       = ZFSet.pair ZFBool.false.val x := congrArg Subtype.val (fapply_inlFun hx)
   simp only [hval]
   exact coprod_of_inl hf hg hx
 
 theorem fapply_inrFun {A B x : ZFSet} (hx : x ∈ B) :
     fapply (inrFun A B) (is_func_is_pfunc inrFun_is_func)
-        ⟨x, by rw [is_func_dom_eq (inrFun_is_func (A := A) (B := B))]; exact hx⟩
+        ⟨x, by zdom⟩
       = ⟨ZFSet.pair ZFBool.true.val x, pair_true_mem_toZFSet hx⟩ := by
   have key : x.pair (ZFSet.pair ZFBool.true.val x) ∈ inrFun A B := by
     rw [inrFun, lambda_spec]
@@ -379,7 +379,7 @@ theorem coprod_comp_inr {A B X f g : ZFSet} (hf : IsFunc A X f) (hg : IsFunc B X
   intro x hx
   rw [fapply_composition (coprod_is_func hf hg) inrFun_is_func hx]
   have hval : (fapply (inrFun A B) (is_func_is_pfunc inrFun_is_func)
-      ⟨x, by rw [is_func_dom_eq (inrFun_is_func (A := A) (B := B))]; exact hx⟩).val
+      ⟨x, by zdom⟩).val
       = ZFSet.pair ZFBool.true.val x := congrArg Subtype.val (fapply_inrFun hx)
   simp only [hval]
   exact coprod_of_inr hf hg hx
@@ -396,12 +396,12 @@ theorem coprod_unique {A B X f g m : ZFSet} (hf : IsFunc A X f) (hg : IsFunc B X
   rcases exists_repr_of_toZFSet hz with ⟨a, ha, rfl⟩ | ⟨b, hb, rfl⟩
   · rw [coprod_of_inl hf hg ha, fapply_composition hm inlFun_is_func ha]
     have hval : (fapply (inlFun A B) (is_func_is_pfunc inlFun_is_func)
-        ⟨a, by rw [is_func_dom_eq (inlFun_is_func (A := A) (B := B))]; exact ha⟩).val
+        ⟨a, by zdom⟩).val
         = ZFSet.pair ZFBool.false.val a := congrArg Subtype.val (fapply_inlFun ha)
     simp only [hval]
   · rw [coprod_of_inr hf hg hb, fapply_composition hm inrFun_is_func hb]
     have hval : (fapply (inrFun A B) (is_func_is_pfunc inrFun_is_func)
-        ⟨b, by rw [is_func_dom_eq (inrFun_is_func (A := A) (B := B))]; exact hb⟩).val
+        ⟨b, by zdom⟩).val
         = ZFSet.pair ZFBool.true.val b := congrArg Subtype.val (fapply_inrFun hb)
     simp only [hval]
 

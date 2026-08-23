@@ -498,7 +498,7 @@ theorem isIso_funs_to_pow_rel {A B : ZFSet} : A.funs B.powerset ≅ᶻ (A.prod B
         apply sep_mem_powerset
         rw [mem_powerset]
     · rintro ⟨f, hf, rfl⟩
-      use f, @ᶻF ⟨f, by rwa [is_func_dom_eq hF, mem_funs]⟩, f
+      use f, @ᶻF ⟨f, by zdom⟩, f
       · rw [eq_self, true_and, ←and_assoc, and_self]
         and_intros
         · exact hf.1
@@ -576,7 +576,7 @@ theorem isIso_funs_to_pow_rel {A B : ZFSet} : A.funs B.powerset ≅ᶻ (A.prod B
       simp only [pair_inj, existsAndEq, and_true, exists_and_left, exists_eq_left', and_self_left]
       and_intros
       · exact hS
-      · use @ᶻG ⟨S, by rwa [is_func_dom_eq hG, mem_powerset]⟩
+      · use @ᶻG ⟨S, by zdom⟩
         and_intros
         · exact fapply_mem_range _ _ |> mem_funs.mp |>.1
         · intro a ha
@@ -1355,7 +1355,7 @@ noncomputable def currify {A B C : ZFSet} (f : ZFSet)
        | a ↦ if ha : a ∈ A then
                 λᶻ : B → C
                    | b ↦ if hb : b ∈ B then
-                          @ᶻf ⟨a.pair b, by rw [is_func_dom_eq hf, pair_mem_prod]; exact ⟨ha, hb⟩⟩
+                          @ᶻf ⟨a.pair b, by zdom⟩
                         else ∅
               else ∅
 

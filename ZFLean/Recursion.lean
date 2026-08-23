@@ -36,7 +36,7 @@ theorem succFun_is_pfunc : succFun.IsPFunc Nat Nat := is_func_is_pfunc succFun_i
 theorem succFun_mem_funs : succFun ∈ funs Nat Nat := mem_funs.mpr succFun_is_func
 
 theorem fapply_succFun {n : ZFSet} (hn : n ∈ Nat) :
-    fapply succFun succFun_is_pfunc ⟨n, by rw [is_func_dom_eq succFun_is_func]; exact hn⟩
+    fapply succFun succFun_is_pfunc ⟨n, by zdom⟩
       = ⟨insert n n, ZFNat.succ_mem_Nat' hn⟩ := by
   have key : n.pair (insert n n) ∈ succFun := by
     rw [succFun, lambda_spec]
@@ -52,15 +52,14 @@ constant motive `{y // y ∈ X}`; `recFun` is its transport into the model.
 noncomputable def recVal {X : ZFSet} (x s : ZFSet) (hx : x ∈ X) (hs : IsFunc X X s) :
     ZFNat → {y // y ∈ X} :=
   fun n => ZFNat.rec (motive := fun _ => {y // y ∈ X}) n ⟨x, hx⟩
-    fun _ ih => @ᶻs ⟨ih.val, by rw [is_func_dom_eq hs]; exact ih.property⟩
+    fun _ ih => @ᶻs ⟨ih.val, by zdom⟩
 
 theorem recVal_zero {X : ZFSet} {x s : ZFSet} (hx : x ∈ X) (hs : IsFunc X X s) :
     recVal x s hx hs 0 = ⟨x, hx⟩ := ZFNat.rec_zero ..
 
 theorem recVal_succ {X : ZFSet} {x s : ZFSet} (hx : x ∈ X) (hs : IsFunc X X s) (n : ZFNat) :
     recVal x s hx hs n.succ
-      = @ᶻs ⟨(recVal x s hx hs n).val, by
-          rw [is_func_dom_eq hs]; exact (recVal x s hx hs n).property⟩ :=
+      = @ᶻs ⟨(recVal x s hx hs n).val, by zdom⟩ :=
   ZFNat.rec_succ ..
 
 /-! ## The recursor as a set -/
@@ -120,7 +119,7 @@ theorem recFun_comp_succFun {X : ZFSet} {x s : ZFSet} (hx : x ∈ X) (hs : IsFun
   rw [fapply_composition (recFun_is_func hx hs) succFun_is_func hn,
     fapply_composition hs (recFun_is_func hx hs) hn]
   have hsucc : (fapply succFun succFun_is_pfunc
-      ⟨n, by rw [is_func_dom_eq succFun_is_func]; exact hn⟩).val = insert n n :=
+      ⟨n, by zdom⟩).val = insert n n :=
     congrArg Subtype.val (fapply_succFun hn)
   have hrec : (fapply (recFun x s hx hs) (recFun_is_pfunc hx hs)
       ⟨n, by rw [is_func_dom_eq (recFun_is_func hx hs)]; exact hn⟩).val
@@ -142,32 +141,32 @@ theorem recFun_unique {X : ZFSet} {x s h : ZFSet} (hx : x ∈ X) (hs : IsFunc X 
     h = recFun x s hx hs := by
   -- `h` applied inside the model, read as a type-level family over `ZFNat`.
   have H_zero : fapply h (is_func_is_pfunc hh)
-      ⟨(0 : ZFNat).val, by rw [is_func_dom_eq hh]; exact (0 : ZFNat).property⟩ = ⟨x, hx⟩ :=
+      ⟨(0 : ZFNat).val, by zdom⟩ = ⟨x, hx⟩ :=
     fapply.of_pair (is_func_is_pfunc hh) h0
   have H_succ : ∀ k : ZFNat,
       fapply h (is_func_is_pfunc hh)
-          ⟨k.succ.val, by rw [is_func_dom_eq hh]; exact k.succ.property⟩
+          ⟨k.succ.val, by zdom⟩
         = @ᶻs ⟨(fapply h (is_func_is_pfunc hh)
-              ⟨k.val, by rw [is_func_dom_eq hh]; exact k.property⟩).val,
-            by rw [is_func_dom_eq hs]; exact Subtype.property _⟩ := by
+              ⟨k.val, by zdom⟩).val,
+            by zdom⟩ := by
     intro k
     have hn := k.property
     have hpt := (is_func_ext_iff (IsFunc_of_composition_IsFunc hh succFun_is_func)
       (IsFunc_of_composition_IsFunc hs hh)).mp hstep k.val hn
     rw [fapply_composition hh succFun_is_func hn, fapply_composition hs hh hn] at hpt
     have hsucc : (fapply succFun succFun_is_pfunc
-        ⟨k.val, by rw [is_func_dom_eq succFun_is_func]; exact hn⟩).val = insert k.val k.val :=
+        ⟨k.val, by zdom⟩).val = insert k.val k.val :=
       congrArg Subtype.val (fapply_succFun hn)
     simp only [hsucc] at hpt
     exact hpt
   -- the typed uniqueness lemma discharges the set-level one
   have key : ∀ k : ZFNat,
-      fapply h (is_func_is_pfunc hh) ⟨k.val, by rw [is_func_dom_eq hh]; exact k.property⟩
+      fapply h (is_func_is_pfunc hh) ⟨k.val, by zdom⟩
         = recVal x s hx hs k :=
     ZFNat.rec_unique (motive := fun _ => {y // y ∈ X}) ⟨x, hx⟩
-      (fun _ ih => @ᶻs ⟨ih.val, by rw [is_func_dom_eq hs]; exact ih.property⟩)
+      (fun _ ih => @ᶻs ⟨ih.val, by zdom⟩)
       (fun k => fapply h (is_func_is_pfunc hh)
-        ⟨k.val, by rw [is_func_dom_eq hh]; exact k.property⟩)
+        ⟨k.val, by zdom⟩)
       H_zero H_succ
   rw [is_func_ext_iff hh (recFun_is_func hx hs)]
   intro n hn

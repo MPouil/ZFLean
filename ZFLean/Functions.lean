@@ -1392,8 +1392,7 @@ theorem fapply_eq_Image_singleton {A B : ZFSet} {f : ZFSet}
 theorem fapply_composition {g f : ZFSet} {A B C : ZFSet}
   (hg : B.IsFunc C g) (hf : A.IsFunc B f) {x : ZFSet} (xA : x ∈ A) :
   @ᶻ(g ∘ᶻ f) ⟨x, by zdom⟩ =
-    @ᶻg ⟨@ᶻf ⟨x, by zdom⟩,
-      by rw [is_func_dom_eq]; apply fapply_mem_range⟩ := by
+    @ᶻg ⟨@ᶻf ⟨x, by zdom⟩, by zdom⟩ := by
   unfold fcomp
   rw [Subtype.ext_iff]
   rw [fapply_eq_Image_singleton (IsFunc_of_composition_IsFunc hg hf) xA,
