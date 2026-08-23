@@ -656,7 +656,8 @@ theorem rec_zero.{u} {motive : ZFNat → Sort u}
 theorem rec_succ.{u} {motive : ZFNat → Sort u} (n : ZFNat)
   (zero : motive 0) (succ' : Π x, motive x → motive (succ x)) :
   rec (succ n) zero succ' = succ' n (ZFNat.rec n zero succ') := by
-    simp [ZFNat.rec, succ, ZFNat.rec'_succ _ n.property]
+    simp only [succ, rec, eq_mpr_eq_cast, id_eq, eq_mp_eq_cast, ZFNat.rec'_succ _ n.property,
+      SetLike.eta, dite_eq_ite]
     exact eq_of_heq (HEq.trans (cast_heq _ _) (cast_heq _ _))
 
 /--
