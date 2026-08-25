@@ -26,6 +26,14 @@ register_label_attr zrel
 register_label_attr zpfun
 register_label_attr zfun
 register_label_attr zdom
+/- Membership in a function space is an *equivalence* with `IsFunc` (`ZFSet.mem_funs`), so neither
+direction can be a seed: with `mem_funs_of_is_func` they would close a cycle inside `zdom`'s
+search. Each tactic instead takes one forward step first, adding to the context the `IsFunc`
+consequence of a function-space membership hypothesis. Rewriting that hypothesis in place
+(`simp only [ZFSet.mem_funs] at *`) does *not* work: at a `@ᶻ` site the goal `x ∈ Dom f ⋯` carries
+a proof term mentioning the hypothesis, so `simp at *` skips it as dependent and reports no
+progress. Adding a new hypothesis sidesteps that, and cannot cycle. -/
+
 /- Converse-shaped membership lemmas (`x ∈ f.Dom → x ∈ A`). Kept out of the main `zdom` seed set:
 together with `mem_dom_of_mem` they let the search loop between `x ∈ A` and `x ∈ f.Dom`, which
 exhausts the heartbeat budget whenever the membership fact is not a local hypothesis. They are
@@ -47,18 +55,21 @@ set_option hygiene false
 macro "zrel" : tactic => `(tactic|
   first
   | sorry_if_sorry
+  | (have := ZFSet.mem_funs.mp ‹_ ∈ ZFSet.funs _ _›; solve_by_elim using zrel, zpfun, zfun)
   | solve_by_elim using zrel, zpfun, zfun)
 
 set_option hygiene false in
 macro "zpfun" : tactic => `(tactic|
   first
   | sorry_if_sorry
+  | (have := ZFSet.mem_funs.mp ‹_ ∈ ZFSet.funs _ _›; solve_by_elim using zpfun, zfun)
   | solve_by_elim using zpfun, zfun)
 
 set_option hygiene false in
 macro "zfun" : tactic => `(tactic|
   first
   | sorry_if_sorry
+  | (have := ZFSet.mem_funs.mp ‹_ ∈ ZFSet.funs _ _›; solve_by_elim using zfun)
   | solve_by_elim using zfun)
 
 /-
@@ -81,7 +92,9 @@ set_option hygiene false in
 macro "zdom" : tactic => `(tactic|
   first
   | sorry_if_sorry
+  | (have := ZFSet.mem_funs.mp ‹_ ∈ ZFSet.funs _ _›; solve_by_elim using zdom, zfun, zpfun)
   | solve_by_elim using zdom, zfun, zpfun
+  | (have := ZFSet.mem_funs.mp ‹_ ∈ ZFSet.funs _ _›; solve_by_elim using zdom, zdom_conv, zfun, zpfun)
   | solve_by_elim using zdom, zdom_conv, zfun, zpfun)
 end ZFTactics
 

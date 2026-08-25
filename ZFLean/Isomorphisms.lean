@@ -441,8 +441,7 @@ theorem isIso_powerset {A B : ZFSet} (h : A ≅ᶻ B) : A.powerset ≅ᶻ B.powe
 open Classical in
 theorem isIso_funs_to_pow_rel {A B : ZFSet} : A.funs B.powerset ≅ᶻ (A.prod B).powerset := by
   let F := λᶻ : (A.funs B.powerset) → (A.prod B).powerset
-              |         f           ↦ if hf : A.IsFunc B.powerset f then
-                                        A.prod B |>.sep fun z ↦
+              |         f           ↦ A.prod B |>.sep fun z ↦
                                           if hz : z ∈ A.prod B then
                                             have : z.π₁ ∈ A := by
                                               rw [mem_prod] at hz
@@ -450,16 +449,12 @@ theorem isIso_funs_to_pow_rel {A B : ZFSet} : A.funs B.powerset ≅ᶻ (A.prod B
                                               rwa [π₁_pair]
                                             z.π₂ ∈ (@ᶻf ⟨z.π₁, by zdom⟩).val
                                           else False
-                                      else ∅
   let G := λᶻ : (A.prod B).powerset → (A.funs B.powerset)
               |         R           ↦ λᶻ: A → B.powerset
-                                        | a ↦ if ha : a ∈ A then
-                                                B.sep fun b ↦ (a.pair b ∈ R) -- {b ∈ B | (a, b) ∈ R}
-                                              else ∅
+                                        | ha : a ↦ B.sep fun b ↦ (a.pair b ∈ R)
   have hF : (A.funs B.powerset).IsFunc (A.prod B).powerset F := by
     apply lambda_isFunc
     intro f hf
-    rw [mem_funs] at hf
     rw [dite_cond_eq_true (eq_true hf)]
     apply sep_mem_powerset
     rw [mem_powerset]
@@ -482,7 +477,7 @@ theorem isIso_funs_to_pow_rel {A B : ZFSet} : A.funs B.powerset ≅ᶻ (A.prod B
       rw [lambda_spec] at fR_F Rg_G
       obtain ⟨_, _, rfl⟩ := fR_F
       obtain ⟨_, _, rfl⟩ := Rg_G
-      rw [dite_cond_eq_true (eq_true hf)]
+      rw [dite_cond_eq_true (eq_true (mem_funs_of_is_func hf))]
       conv_rhs => rw [lambda_eta hf]
       rw [lambda_ext_iff ?_]
       · intro a ha
@@ -526,7 +521,7 @@ theorem isIso_funs_to_pow_rel {A B : ZFSet} : A.funs B.powerset ≅ᶻ (A.prod B
               generalize_proofs _ _ ha_f_dom Fpfunc f_Fdom
               rw [fapply_lambda (ha := by rwa [mem_funs]), dite_cond_eq_true (eq_true ha),
                 dite_cond_eq_true (eq_true ha),
-                dite_cond_eq_true (eq_true hf)]
+                dite_cond_eq_true (eq_true (mem_funs_of_is_func hf))]
               · ext1 z
                 constructor
                 · intro hz
@@ -540,7 +535,7 @@ theorem isIso_funs_to_pow_rel {A B : ZFSet} : A.funs B.powerset ≅ᶻ (A.prod B
                   obtain ⟨-, _, z_mem⟩ := hz
                   exact z_mem
               · intro X hX
-                rw [dite_cond_eq_true (eq_true <| mem_funs.mp hX)]
+                rw [dite_cond_eq_true (eq_true hX)]
                 apply sep_mem_powerset
                 rw [mem_powerset]
             · intro a ha
@@ -555,7 +550,7 @@ theorem isIso_funs_to_pow_rel {A B : ZFSet} : A.funs B.powerset ≅ᶻ (A.prod B
       rw [lambda_spec] at Rf_G fS_F
       obtain ⟨_, _, rfl⟩ := Rf_G
       obtain ⟨_, _, rfl⟩ := fS_F
-      rw [dite_cond_eq_true (eq_true hS)]
+      rw [dite_cond_eq_true (eq_true (mem_funs_of_is_func hS))]
       ext1 ab
       simp only [mem_prod, dite_eq_ite, dite_else_false, mem_sep, and_exists_self]
       constructor
@@ -616,7 +611,7 @@ theorem isIso_funs_to_pow_rel {A B : ZFSet} : A.funs B.powerset ≅ᶻ (A.prod B
               have fapp_eq :
                 ↑(@ᶻG ⟨S, S_Gdom⟩) =
                 (λᶻ : A → B.powerset
-                    | a ↦ if ha : a ∈ A then B.sep (fun b => a.pair b ∈ S) else ∅)
+                    | ha : a ↦ B.sep (fun b => a.pair b ∈ S))
                   := by
                 rw [fapply_lambda]
                 · intros
@@ -655,7 +650,7 @@ theorem isIso_funs_to_pow_rel {A B : ZFSet} : A.funs B.powerset ≅ᶻ (A.prod B
                 rw [choose₂_spec.2.2.2, mem_sep] at h
                 exact h.2
             · rw [fapply_lambda]
-              · apply lambda_isFunc
+              · apply mem_funs_of_lambda
                 intro a ha
                 rw [dite_cond_eq_true (eq_true ha)]
                 apply sep_mem_powerset
@@ -676,17 +671,15 @@ theorem isIso_of_funs {A B C D : ZFSet} (h : A ≅ᶻ C) (h' : B ≅ᶻ D) : A.f
   have : F⁻¹ ⊆ C.prod A := by apply subset_prod_inv
   obtain ⟨G, hG, Gbij⟩ := h'
   let ξ := λᶻ : (A.funs B) → (C.funs D)
-              |     f      ↦ if hf : f ⊆ A.prod B then
-                              λᶻ: C → D
-                                | c ↦ ⋂₀ (G[f[F⁻¹[{c}]]])
-                            else ∅
+              |  hf : f    ↦ λᶻ: C → D
+                               | c ↦ ⋂₀ (G[f[F⁻¹[{c}]]])
   use ξ, ?_
   · rw [bijective_exists1_iff]
     intro f hf
     rw [mem_funs] at hf
     have Ginv_isfunc := inv_is_func_of_bijective Gbij
     let g := λᶻ : A → B
-                | a ↦ if ha : a ∈ A then ⋂₀ (G⁻¹[f[F[{a}]]]) else ∅
+                | ha : a ↦ ⋂₀ (G⁻¹[f[F[{a}]]])
     have hg : A.IsFunc B g := by
       apply lambda_isFunc
       intro a ha
@@ -712,7 +705,7 @@ theorem isIso_of_funs {A B C D : ZFSet} (h : A ≅ᶻ C) (h' : B ≅ᶻ D) : A.f
         exact hg
       · rw [mem_funs]
         exact hf
-      · rw [dite_cond_eq_true (eq_true hg.1), lambda_eta hf, lambda_ext_iff]
+      · rw [dite_cond_eq_true (eq_true (mem_funs_of_is_func hg)), lambda_eta hf, lambda_ext_iff]
         · intro c hc
           rw [dite_cond_eq_true (eq_true hc)]
           rw [Image_singleton_eq_fapply (inv_is_func_of_bijective Fbij) hc,
@@ -779,7 +772,7 @@ theorem isIso_of_funs {A B C D : ZFSet} (h : A ≅ᶻ C) (h' : B ≅ᶻ D) : A.f
     · rintro g' ⟨hg', g'f_ξ⟩
       rw [lambda_spec] at g'f_ξ
       obtain ⟨-,-,f_eq⟩ := g'f_ξ
-      rw [dite_cond_eq_true (eq_true (by rw [mem_funs] at hg'; exact hg'.1))] at f_eq
+      rw [dite_cond_eq_true (eq_true hg')] at f_eq
       subst f_eq
       rw [lambda_eta (mem_funs.mp hg'), lambda_ext_iff]
       · intro a ha
@@ -791,7 +784,7 @@ theorem isIso_of_funs {A B C D : ZFSet} (h : A ≅ᶻ C) (h' : B ≅ᶻ D) : A.f
         conv_rhs =>
           unfold fapply
         dsimp
-        generalize_proofs g'pfunc g'rel a_g'dom Grel Frel acF dclambda bdGinv
+        generalize_proofs g'pfunc g'rel a_g'dom Grel Frel Finvrel acF dclambda bdGinv
         have ⟨cC, ac_F⟩ := Classical.choose_spec acF
         have ⟨bB, db_G⟩ := Classical.choose_spec bdGinv
         have ⟨dD, dc_eq⟩:= Classical.choose_spec dclambda
@@ -865,9 +858,9 @@ theorem isIso_of_funs {A B C D : ZFSet} (h : A ≅ᶻ C) (h' : B ≅ᶻ D) : A.f
             · exact hG.1 hd |> pair_mem_prod.mp |>.2
             · rwa [←Image_of_singleton_pair_mem_iff hG]
           rwa [a_def, b_def, d_def, sInter_singleton]
-        · rw [dite_cond_eq_true (eq_true hf.1)]
+        · rw [dite_cond_eq_true (eq_true (mem_funs_of_is_func hf))]
       · intro g hg
-        rw [lambda_spec, dite_cond_eq_true (eq_true hf.1)] at hg
+        rw [lambda_spec, dite_cond_eq_true (eq_true (mem_funs_of_is_func hf))] at hg
         exact hg.2.2
 
 theorem isIso_powerset_char_pred {A : ZFSet} : A.powerset ≅ᶻ A.funs 𝔹 := by
@@ -1361,12 +1354,8 @@ open Classical in
 noncomputable def currify {A B C : ZFSet} (f : ZFSet)
   (hf : (A.prod B).IsFunc C f := by zfun) : ZFSet :=
   λᶻ : A   → (B.funs C)
-       | a ↦ if ha : a ∈ A then
-                λᶻ : B → C
-                   | b ↦ if hb : b ∈ B then
-                          @ᶻf ⟨a.pair b, by zdom⟩
-                        else ∅
-              else ∅
+       | ha : a ↦ λᶻ : B → C
+                    | hb : b ↦ @ᶻf ⟨a.pair b, by zdom⟩
 
 @[zfun]
 theorem currify_is_func {A B C : ZFSet} (f : ZFSet)
@@ -1395,7 +1384,9 @@ open Classical in
 noncomputable def uncurrify {A B C : ZFSet} (g : ZFSet)
   (hg : A.IsFunc (B.funs C) g := by zfun) : ZFSet :=
   λᶻ : (A.prod B) → C
-       | (a, b) ↦ if hab : a ∈ A ∧ b ∈ B then
+     | hab : (a, b) ↦
+                have hab : a ∈ A ∧ b ∈ B := by
+                  rwa [pair_eta hab, pair_mem_prod] at hab
                 let f := @ᶻg ⟨a, by
                     rw [is_func_dom_eq hg]
                     exact hab.1
@@ -1405,7 +1396,6 @@ noncomputable def uncurrify {A B C : ZFSet} (g : ZFSet)
                     rw [is_func_dom_eq hf]
                     exact hab.2
                   ⟩
-              else ∅
 
 @[zfun]
 theorem uncurrify_is_func {A B C : ZFSet} (g : ZFSet)
@@ -1414,7 +1404,7 @@ theorem uncurrify_is_func {A B C : ZFSet} (g : ZFSet)
   intro z hz
   rw [mem_prod] at hz
   obtain ⟨a, ha, b, hb, rfl⟩ := hz
-  rw [dite_cond_eq_true (eq_true (by simp only [π₁_pair, ha, π₂_pair, hb, and_self]))]
+  rw [dite_cond_eq_true (eq_true (pair_mem_prod_of_mem ha hb))]
   simp only [π₂_pair, SetLike.coe_mem]
 
 @[simp]
@@ -1436,11 +1426,10 @@ theorem currify_of_uncurrify {A B C : ZFSet} (f : ZFSet)
             fapply_lambda
               (by
                 intro _ h
-                rw [pair_eta h, pair_mem_prod] at h
                 rw [dite_cond_eq_true (eq_true h)]
                 apply fapply_mem_range)
               (by rw [pair_mem_prod]; exact ⟨hx, hy⟩),
-            dite_cond_eq_true (eq_true (by simp only [π₁_pair, π₂_pair, hx, hy, and_self]))]
+            dite_cond_eq_true (eq_true (by rw [pair_mem_prod]; exact ⟨hx, hy⟩))]
           simp only [π₁_pair, π₂_pair]
         congr 2
         · simp only [π₁_pair]
@@ -1468,7 +1457,6 @@ theorem uncurrify_of_currify {A B C : ZFSet} (g : ZFSet)
       obtain ⟨a, ha, b, hb, rfl⟩ := mem_prod.mp hab
       simp_rw [dite_cond_eq_true (eq_true hab), π₂_pair]
       conv_lhs =>
-        rw [dite_cond_eq_true (eq_true (by simp only [π₁_pair, ha, π₂_pair, hb, and_self]))]
         rw [fapply_eq_Image_singleton (by rw [←mem_funs]; apply fapply_mem_range) hb]
         conv =>
           enter [1,1]
@@ -1489,20 +1477,16 @@ theorem uncurrify_of_currify {A B C : ZFSet} (g : ZFSet)
           fapply_lambda (fun h ↦ by rw [dite_cond_eq_true (eq_true h)]; apply fapply_mem_range) hb,
           dite_cond_eq_true (eq_true hb)]
     · intro _ h
-      rw [dite_cond_eq_true (eq_true (by rwa [←pair_mem_prod, ←pair_eta h]))]
+      rw [dite_cond_eq_true (eq_true h)]
       apply fapply_mem_range
 
 open Classical in
 theorem isIso_curry {A B C : ZFSet} :
   (A.prod B).funs C ≅ᶻ A.funs (B.funs C) := by
   let curry  := λᶻ : (A.prod B).funs C → A.funs (B.funs C)
-    | f ↦ if hf : f ∈ (A.prod B).funs C then
-            currify f (mem_funs.mp hf)
-          else ∅
+    | hf : f ↦ currify f
   let uncurry := λᶻ : A.funs (B.funs C) → (A.prod B).funs C
-    | g ↦ if hg : g ∈ A.funs (B.funs C) then
-            uncurrify g (mem_funs.mp hg)
-          else ∅
+    | hg : g ↦ uncurrify g
   have hcurry : IsFunc ((A.prod B).funs C) (A.funs (B.funs C)) curry := by
     apply lambda_isFunc
     intro f hf

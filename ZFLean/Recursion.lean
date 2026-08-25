@@ -69,7 +69,7 @@ theorem recVal_succ {X : ZFSet} {x s : ZFSet} (hx : x ∈ X) (hs : IsFunc X X s)
 open Classical in
 /-- The set-level recursor: the element of `Nat.funs X` sending `n` to `sⁿ x`. -/
 noncomputable def recFun {X : ZFSet} (x s : ZFSet) (hx : x ∈ X) (hs : IsFunc X X s) : ZFSet :=
-  λᶻ : Nat → X | n ↦ if hn : n ∈ Nat then (recVal x s hx hs ⟨n, hn⟩).val else ∅
+  λᶻ : Nat → X | hn : n ↦ (recVal x s hx hs ⟨n, hn⟩).val
 
 @[zfun]
 theorem recFun_is_func {X : ZFSet} {x s : ZFSet} (hx : x ∈ X) (hs : IsFunc X X s) :

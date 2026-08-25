@@ -272,14 +272,12 @@ tagged by `false` and `g` to those tagged by `true`.
 noncomputable def coprod {A B X : ZFSet} (f g : ZFSet)
   (hf : IsFunc A X f := by zfun) (hg : IsFunc B X g := by zfun) : ZFSet :=
   λᶻ : toZFSet A B → X
-     |       z     ↦ if hz : z ∈ toZFSet A B then
-                       if h : z.π₁ = ZFBool.false.val then
-                         (@ᶻf ⟨z.π₂, by
-                           rw [is_func_dom_eq hf]; exact mem_left_of_toZFSet hz h⟩).val
-                       else
-                         (@ᶻg ⟨z.π₂, by
-                           rw [is_func_dom_eq hg]; exact mem_right_of_toZFSet hz h⟩).val
-                     else ∅
+     |  hz : z     ↦ if h : z.π₁ = ZFBool.false.val then
+                       (@ᶻf ⟨z.π₂, by
+                         rw [is_func_dom_eq hf]; exact mem_left_of_toZFSet hz h⟩).val
+                     else
+                       (@ᶻg ⟨z.π₂, by
+                         rw [is_func_dom_eq hg]; exact mem_right_of_toZFSet hz h⟩).val
 
 @[zfun]
 theorem coprod_is_func {A B X f g : ZFSet} (hf : IsFunc A X f) (hg : IsFunc B X g) :
@@ -668,12 +666,10 @@ noncomputable def flift {A B : ZFSet} (f : ZFSet)
     {f' : ZFSet // IsFunc (Option.toZFSet A) (Option.toZFSet B) f'} :=
   let f' : ZFSet :=
     λᶻ: Option.toZFSet A → Option.toZFSet B
-      |          x       ↦ if hx : x ∈ Option.toZFSet A then
-                              if isSome : ∃ y, ⟨x, hx⟩ = some y then
-                                let ⟨y, hy⟩ := Classical.choose isSome
-                                some (S := B) (@ᶻf ⟨y, by zdom⟩) |>.val
-                              else none (S := B).val
-                            else ∅
+      |     hx : x       ↦ if isSome : ∃ y, ⟨x, hx⟩ = some y then
+                              let ⟨y, hy⟩ := Classical.choose isSome
+                              some (S := B) (@ᶻf ⟨y, by zdom⟩) |>.val
+                            else none (S := B).val
   have hf' : IsFunc (Option.toZFSet A) (Option.toZFSet B) f' := by
     apply ZFSet.lambda_isFunc
     intro x hx

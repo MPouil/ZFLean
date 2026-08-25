@@ -700,6 +700,7 @@ theorem pair_mem_prod_of_mem {A B a b : ZFSet} (ha : a ∈ A) (hb : b ∈ B) :
 theorem mem_funs_of_is_func {A B f : ZFSet} (hf : IsFunc A B f) : f ∈ A.funs B :=
   mem_funs.mpr hf
 
+
 /-- Introduction form of `mem_powerset`. -/
 @[zdom]
 theorem mem_powerset_of_subset {A B : ZFSet} (h : A ⊆ B) : A ∈ B.powerset :=
@@ -870,6 +871,7 @@ section
 declare_syntax_cat funz_binder
 syntax (name := identZBinder) Term.ident : funz_binder
 syntax (name := tupleZBinder) "(" funz_binder ", " funz_binder ")" : funz_binder
+syntax (name := namedZBinder) Term.ident " : " funz_binder : funz_binder
 
 meta def funZBinder : Parser := categoryParser `funz_binder 0
 
@@ -895,14 +897,64 @@ meta partial def interpZBinder (x_def : TSyntax `term) (e : TSyntax `term) :
     `(term| letI w := $x_def; $e₁)
   | _ => Macro.throwUnsupported
 
+open Lean Lean.Elab Lean.Elab.Term Lean.Meta in
 /--
 Interpret the syntax `λᶻ : dom → ran | x ↦ exp x` as `lambda dom ran (fun x ↦ exp x)`.
 
+The body is elaborated with the membership proof of the bound variable in scope, since an
+abstraction over `dom` does not by itself record that its argument lies in `dom`. Writing
+`| h : x ↦ exp x` names that proof `h`; writing `| x ↦ exp x` keeps it inaccessible, reachable
+only by tactics such as `zdom` or `assumption`. Whenever the body uses it — always, for a named
+binder — the abstraction is wrapped in `if h : x ∈ dom then exp x else ∅`; a body that ignores it
+elaborates to `lambda dom ran (fun x ↦ exp x)` unchanged.
+
 *Thanks to Ghilain for this notation.*
 -/
-macro_rules
-| `(term| λᶻ : $dom → $ran | $x ↦ $e) => do
-  `(term| ZFSet.lambda $dom $ran fun a ↦ $(← interpZBinder (←`(term| a)) e x))
+@[term_elab funZ]
+meta def elabFunZ : TermElab := fun stx _ ↦ do
+  match stx with
+  | `(term| λᶻ : $dom → $ran | $b ↦ $e) => do
+    -- an optional user-supplied name for the membership hypothesis
+    let split := match b with
+      | `(funz_binder| $h:ident : $b':funz_binder) => (some h, b')
+      | _ => ((none : Option Ident), b)
+    let hStx? := split.1
+    let bind := split.2
+    let u ← mkFreshLevelMVar
+    let zf := Lean.mkConst ``ZFSet [u]
+    let domE ← elabTerm dom (some zf)
+    let ranE ← elabTerm ran (some zf)
+    let domS ← exprToSyntax domE
+    -- the abstraction keeps the user's own binder name; tuple patterns need an auxiliary
+    let xName ← match bind with
+      | `(funz_binder| $x:ident) => pure x.getId
+      | _ => mkFreshUserName `w
+    let body ← withLocalDeclD xName zf fun x ↦ do
+      let xS ← exprToSyntax x
+      let memType ← elabTerm (← `($xS ∈ $domS)) (some (Lean.mkSort .zero))
+      -- named: accessible from the body. unnamed: macro-scoped, so only tactics can reach it
+      let hName ← match hStx? with
+        | some h => pure h.getId
+        | none => mkFreshUserName `h
+      withLocalDeclD hName memType fun h ↦ do
+        let bodyStx ← match bind with
+          | `(funz_binder| $_:ident) => pure e
+          | `(funz_binder| ($p, $q)) => liftMacroM do
+              let e₂ ← interpZBinder (← `(term| ZFSet.π₂ $xS)) e q
+              interpZBinder (← `(term| ZFSet.π₁ $xS)) e₂ p
+          | _ => throwUnsupportedSyntax
+        let bodyE ← instantiateMVars (← withSynthesize (postpone := .no) do
+          elabTermEnsuringType bodyStx zf)
+        if hStx?.isSome || bodyE.containsFVar h.fvarId! then
+          let emptyE ← mkAppOptM ``EmptyCollection.emptyCollection #[zf, none]
+          let dec ← mkAppOptM ``Classical.propDecidable #[memType]
+          let tBranch ← mkLambdaFVars #[h] bodyE
+          let eBranch ← withLocalDeclD `hn (mkNot memType) fun hn ↦ mkLambdaFVars #[hn] emptyE
+          mkLambdaFVars #[x] (← mkAppOptM ``dite #[zf, memType, dec, tBranch, eBranch])
+        else
+          mkLambdaFVars #[x] bodyE
+    mkAppM ``ZFSet.lambda #[domE, ranE, body]
+  | _ => throwUnsupportedSyntax
 end
 
 theorem lambda_spec {dom ran : ZFSet} {exp : ZFSet → ZFSet} {x : ZFSet} {y : ZFSet} :
@@ -1001,7 +1053,7 @@ theorem lambda_ext_iff' {d₁ d₂ r₁ r₂ : ZFSet} {f₁ f₂ : ZFSet → ZFS
 open Classical in
 theorem lambda_eta {A B : ZFSet} {f : ZFSet} (hf : A.IsFunc B f) :
   f = (λᶻ : A → B
-          | x ↦ if hx : x ∈ A then @ᶻf ⟨x, by zdom⟩ else ∅)
+          | x ↦ @ᶻf ⟨x, by zdom⟩)
     := by
   ext1 z
   constructor <;> intro hz
@@ -2611,19 +2663,17 @@ open Classical in
 noncomputable def fprod {A B A' B' : ZFSet} (f g : ZFSet)
   (hf : A.IsFunc A' f := by zfun) (hg : B.IsFunc B' g := by zfun) : ZFSet :=
   λᶻ : A.prod B → A'.prod B'
-     |    z     ↦ if hz : z ∈ A.prod B then
-                   let a := z.π₁
-                   let b := z.π₂
-                   let fa : ZFSet := @ᶻf ⟨a, by
-                     rw [is_func_dom_eq hf]
-                     rw [pair_eta hz, pair_mem_prod] at hz
-                     exact hz.1⟩
-                   let gb : ZFSet := @ᶻg ⟨b, by
-                     rw [is_func_dom_eq hg]
-                     rw [pair_eta hz, pair_mem_prod] at hz
-                     exact hz.2⟩
-                   fa.pair gb
-                  else ∅
+     | hz : z   ↦ let a := z.π₁
+                  let b := z.π₂
+                  let fa : ZFSet := @ᶻf ⟨a, by
+                    rw [is_func_dom_eq hf]
+                    rw [pair_eta hz, pair_mem_prod] at hz
+                    exact hz.1⟩
+                  let gb : ZFSet := @ᶻg ⟨b, by
+                    rw [is_func_dom_eq hg]
+                    rw [pair_eta hz, pair_mem_prod] at hz
+                    exact hz.2⟩
+                  fa.pair gb
 @[zfun]
 theorem fprod_is_func {A B A' B' φ ψ : ZFSet} (hφ : A.IsFunc A' φ) (hψ : B.IsFunc B' ψ) :
   (A.prod B).IsFunc (A'.prod B') (fprod φ ψ) := by
