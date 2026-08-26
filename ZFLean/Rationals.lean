@@ -7,7 +7,7 @@ module
 
 public import ZFLean.Integers
 import ZFLean.TransferAlgebra
-import ZFLean.Quotient
+public import ZFLean.Quotient
 import Mathlib.Data.Rat.Cast.Order
 import Mathlib.Tactic.Ring
 
@@ -933,6 +933,7 @@ noncomputable def zf_qcarrier_equiv_qcarrier :
 
 /- The relation equivalence of Rat, which is equivalent to equivalence relation of ZFRat -/
 open Classical in
+@[expose]
 noncomputable def zf_qrel : ZFSet := (zf_qcarrier.prod zf_qcarrier).sep fun pq =>
   if h : pq ∈ zf_qcarrier.prod zf_qcarrier then
     let h := mem_prod.mp h
@@ -979,7 +980,7 @@ theorem zf_qrel_equiv_qrel :
   rw [true_and, dif_pos <| pair_mem_prod.mpr ⟨x.prop, y.prop⟩]
   dsimp only
   rw [←propext_iff]
-  congr <;> (simp ; congr)
+  congr <;> simp only [π₁_pair, π₂_pair]
 
 theorem zf_qrel_eq : zf_qrel.is_rel_equivalence sep_subset :=  by
   apply zf_qcarrier.equivZFRelation_Equivalence ⟨zf_qrel, sep_subset⟩ |>.mp
@@ -991,7 +992,7 @@ noncomputable def Rat : ZFSet := Int.prod (Int \ {(0 : ZFInt).into.val} ) |>.ZFQ
 
 noncomputable def equivRatZFRat : Rat ≃ ZFRat :=
   Equiv.trans
-  (@ZFQuotient.equivZFQuotient zf_qcarrier zf_qrel sep_subset zf_qrel_eq ZFQuotient.choose_witness)
+  (@ZFQuotient.equivZFQuotient zf_qcarrier zf_qrel sep_subset zf_qrel_eq)
   (Quotient.congr zf_qcarrier_equiv_qcarrier (by
     unfold ZFSet.instSetoidZFIntZFInt' ZFQuotient.toSetoid
     dsimp only

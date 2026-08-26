@@ -1,7 +1,11 @@
-import Mathlib.SetTheory.ZFC.Basic
-import ZFLean.Def
+module
+
+public import Mathlib.SetTheory.ZFC.Basic
+public import ZFLean.Def
 import ZFLean.Tactics
-import ZFLean.Functions
+public import ZFLean.Functions
+
+public section
 
 namespace ZFSet
 
@@ -62,7 +66,9 @@ instance (E : ZFSet) : TransferEquiv { R : ZFSet // R ⊆ E.prod E } (E → E �
   equiv := E.equivZFRelation
 
 theorem equivZFRelation_related (E : ZFSet) (R : { R : ZFSet // R ⊆ E.prod E }) (x y : E) :
-    E.equivZFRelation R x y = (x.val.pair y.val ∈ R.val) := rfl
+    E.equivZFRelation R x y = (x.val.pair y.val ∈ R.val) := by
+  unfold equivZFRelation
+  dsimp
 
 theorem equivZFRelation_Reflexivity (E : ZFSet) (R : { R : ZFSet // R ⊆ E.prod E }) :
     (∀ x, E.equivZFRelation R x x) = is_rel_reflexive R.val R.prop := by
@@ -125,6 +131,7 @@ theorem ZFEquiv_of_Equivalence (E : ZFSet) (r : E → E → Prop) (re : Equivale
   (equivZFRelation_Equivalence E (E.equivZFRelation.symm r)).mp
     ( by rw [@Equiv.apply_symm_apply] ; exact re)
 
+@[expose]
 def ZFQuotient (E R : ZFSet) : ZFSet :=
   E.powerset.sep (fun c => ∃ x ∈ c, ∀ y : ZFSet, y ∈ c ↔ x.pair y ∈ R)
 
@@ -132,28 +139,33 @@ namespace ZFQuotient
 
 variable
   {E R : ZFSet}
-  (hrR : R ⊆ E.prod E := by zrel)
-  (heR : R.is_rel_equivalence hrR := by assumption)
 
-def class_of (x : E) : E.ZFQuotient R := ⟨E.sep fun y => x.val.pair y ∈ R, by
-  rw [ZFQuotient, mem_sep, mem_powerset]
-  exists sep_subset, x
-  rw [mem_sep]
-  rw [is_rel_equivalence, R.is_rel_reflexive_iff hrR, R.is_rel_symmetric_iff hrR] at heR
-  exists ⟨x.prop, heR.left x x.prop⟩
-  intro y
-  rw [mem_sep, and_iff_right_of_imp (And.right <| pair_mem_prod.mp <| hrR ·)]
-⟩
 
-theorem mem_class_of_self (x : E) : x.val ∈ (class_of hrR heR x).val := by
+def class_of (hrR : R ⊆ E.prod E := by zrel)
+  (heR : R.is_rel_equivalence hrR := by assumption) (x : E) :
+    E.ZFQuotient R :=
+  ⟨E.sep fun y => x.val.pair y ∈ R, by
+    rw [ZFQuotient, mem_sep, mem_powerset]
+    exists sep_subset, x
+    rw [mem_sep]
+    rw [is_rel_equivalence, R.is_rel_reflexive_iff hrR, R.is_rel_symmetric_iff hrR] at heR
+    exists ⟨x.prop, heR.left x x.prop⟩
+    intro y
+    rw [mem_sep, and_iff_right_of_imp (And.right <| pair_mem_prod.mp <| hrR ·)]
+  ⟩
+
+theorem mem_class_of_self (hrR : R ⊆ E.prod E := by zrel)
+  (heR : R.is_rel_equivalence hrR := by assumption) (x : E) :
+    x.val ∈ (class_of hrR heR x).val := by
   rw [class_of, mem_sep]
   constructor
   · exact x.prop
   · rw [is_rel_equivalence, R.is_rel_reflexive_iff] at heR
     exact heR.left x x.prop
 
-theorem mem_class_of_iff_related (x : E) (y : ZFSet) :
-  y ∈ (class_of hrR heR x).val ↔ y.pair x.val ∈ R := by
+theorem mem_class_of_iff_related (hrR : R ⊆ E.prod E := by zrel)
+  (heR : R.is_rel_equivalence hrR := by assumption) (x : E) (y : ZFSet) :
+    y ∈ (class_of hrR heR x).val ↔ y.pair x.val ∈ R := by
   rw [class_of, mem_sep, and_iff_right_of_imp (And.right <| pair_mem_prod.mp <| hrR ·)]
   rw [is_rel_equivalence, R.is_rel_symmetric_iff hrR] at heR
   exact heR.right.left x y
@@ -162,7 +174,8 @@ theorem mem_class_of_iff_related (x : E) (y : ZFSet) :
 def of_in_class {C : E.ZFQuotient R} (w : C.val) : E :=
   ⟨w |>.val, (mem_powerset.mp <| And.left <| mem_sep.mp C.prop) w.prop⟩
 
-theorem class_of_mem_eq_self (C : E.ZFQuotient R) (x : C.val) :
+theorem class_of_mem_eq_self (hrR : R ⊆ E.prod E := by zrel)
+  (heR : R.is_rel_equivalence hrR := by assumption) (C : E.ZFQuotient R) (x : C.val) :
     class_of hrR heR (of_in_class x) = C := by
   obtain ⟨x, hx⟩ := x
   obtain ⟨C, hC⟩ := C
@@ -180,34 +193,37 @@ theorem class_of_mem_eq_self (C : E.ZFQuotient R) (x : C.val) :
   · intro zy_related
     exact t x z y ⟨s z x |>.mp (extC x |>.mp hx), zy_related⟩
 
-theorem class_eq_iff_related (x y : E) :
+theorem class_eq_iff_related (hrR : R ⊆ E.prod E := by zrel)
+  (heR : R.is_rel_equivalence hrR := by assumption) (x y : E) :
     class_of hrR heR x = class_of hrR heR y ↔ x.val.pair y.val ∈ R := by
   constructor
   · intro h
-    rw [←mem_class_of_iff_related, ←h]
+    rw [←mem_class_of_iff_related hrR heR, ←h]
     exact mem_class_of_self hrR heR x
   · intro xy_related
     obtain ⟨x, x_E⟩ := x
-    rw [←mem_class_of_iff_related] at xy_related
+    rw [←mem_class_of_iff_related hrR heR] at xy_related
     change class_of _ _ (of_in_class ⟨x, xy_related⟩) = _
-    rw [class_of_mem_eq_self]
+    rw [class_of_mem_eq_self hrR heR]
 
-noncomputable def choose_witness (C : E.ZFQuotient R) : C.val :=
+@[expose]
+noncomputable def choose_repr (C : E.ZFQuotient R) : C.val :=
     let hC := mem_sep.mp C.prop
     ⟨hC.right.choose, hC.right.choose_spec.left⟩
 
-variable (w : Π C : E.ZFQuotient R, C.val := choose_witness)
-
-def lift
+noncomputable def lift
     (f : E → α) (C : E.ZFQuotient R) : α :=
-  (f (of_in_class (w C)))
+  (f (of_in_class (choose_repr C)))
 
-theorem lift_class_of (f : E → α) (h : ∀ a b, a.val.pair b.val ∈ R → f a = f b) (x : E) :
-    lift w f (class_of hrR heR x) = f x := by
+theorem lift_class_of (hrR : R ⊆ E.prod E := by zrel)
+(heR : R.is_rel_equivalence hrR := by assumption) (f : E → α)
+(h : ∀ a b, a.val.pair b.val ∈ R → f a = f b) (x : E) :
+    lift f (class_of hrR heR x) = f x := by
   apply h
-  rw [of_in_class, ←mem_class_of_iff_related]
-  exact Subtype.prop <| w <| class_of _ _ x
+  rw [of_in_class, ←mem_class_of_iff_related hrR heR]
+  exact Subtype.prop <| choose_repr <| class_of _ _ x
 
+@[expose]
 def toSetoid {E R : ZFSet}
     (hrR : R ⊆ E.prod E := by zrel)
     (heR : R.is_rel_equivalence hrR := by assumption) : Setoid E where
@@ -216,9 +232,10 @@ def toSetoid {E R : ZFSet}
 
 
 
-def equivZFQuotient :
-  Equiv (ZFQuotient E R) (Quotient <| toSetoid  hrR heR) where
-  toFun C := lift w (fun x => ⟦x⟧) C
+noncomputable def equivZFQuotient (hrR : R ⊆ E.prod E := by zrel)
+  (heR : R.is_rel_equivalence hrR := by assumption) :
+    Equiv (ZFQuotient E R) (Quotient <| toSetoid  hrR heR) where
+  toFun C := lift (fun x => ⟦x⟧) C
   invFun W := Quotient.liftOn W (fun W => class_of hrR heR W) (by
     intro a b related
     change a.val.pair b.val ∈ R at related
@@ -227,8 +244,8 @@ def equivZFQuotient :
   left_inv := by
     intro C
     dsimp only
-    let W := w C
-    rw [←class_of_mem_eq_self hrR heR C, lift_class_of _ _ _ _ _ (of_in_class W),Quotient.liftOn_mk]
+    let W := choose_repr C
+    rw [←class_of_mem_eq_self hrR heR C, lift_class_of _ _ _ _ (of_in_class W),Quotient.liftOn_mk]
     intro a b related
     rw [Quotient.eq]
     exact related
@@ -260,6 +277,7 @@ noncomputable def equivZFQuotient_of_rel {r : E → E → Prop} (re : Equivalenc
       rfl
     )
 
+@[expose]
 noncomputable def equivZFProdProd {E F : ZFSet} : Equiv (E.prod F) (E × F) where
   toFun p := (
     ⟨p.val.π₁, by obtain ⟨_,_,_,_,hp⟩ := mem_prod.mp p.prop ; rwa [hp, π₁_pair]⟩,
@@ -277,3 +295,5 @@ noncomputable def equivZFProdProd {E F : ZFSet} : Equiv (E.prod F) (E × F) wher
 end ZFQuotient
 
 end ZFSet
+
+end

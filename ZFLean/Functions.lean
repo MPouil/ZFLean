@@ -665,7 +665,7 @@ theorem is_rel_transitive_iff (R : ZFSet) {A B : ZFSet} (hR : R ⊆ A.prod B := 
   · rintro h _ ⟨x, y, z, rfl, _, _, _, t⟩
     exact h x y z t
 
-
+@[expose]
 def is_rel_equivalence (R : ZFSet) {A : ZFSet} (hR : R ⊆ A.prod A := by zrel) :=
   R.is_rel_reflexive hR ∧ R.is_rel_symmetric hR ∧ R.is_rel_transitive hR
 
