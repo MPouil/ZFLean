@@ -120,6 +120,13 @@ private lemma some_inf_mem_sep_inductive_set : some_inf ∈ some_inf.powerset.se
   simp only [mem_sep, mem_powerset, subset_refl, true_and]
   exact inductive_some_inf
 
+theorem sdiff_subset {s t : ZFSet} : s \ t ⊆ s := by
+  intro x
+  rw [mem_sdiff]
+  rintro ⟨h, _⟩
+  exact h
+
+/-- Symmetric difference of two sets, denoted by `Δ`. -/
 def symmDiff (p q : ZFSet) : ZFSet := (p \ q) ∪ (q \ p)
 infix:70 " Δ " => symmDiff
 
